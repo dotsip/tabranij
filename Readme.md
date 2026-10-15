@@ -1,16 +1,18 @@
 # TABRANIJ Pro v3.2 — TARI Extended
 ### Genesis Riwayat Angka Faktual Informasi Keuangan
-**Visualizer Interaktif Spasial 3D/2D & Ontologi Candlestick Faktual untuk Manusia, Algoritma, dan Superintelligence**
+**Ontologi Candlestick Faktual, Visualizer Spasial 3D/2D, Suite MetaTrader 5 & Modul Kuantitatif Python**
 
 [![Live Web App](https://img.shields.io/badge/Live%20App-surgas.github.io%2Ftabranij-blue?style=for-the-badge)](https://surgas.github.io/tabranij/)
+[![MetaTrader 5](https://img.shields.io/badge/MetaTrader%205-MQL5%20Suite-gold?style=for-the-badge)](mql5/)
+[![Python](https://img.shields.io/badge/Python-Data%20Science-blue?style=for-the-badge)](python/)
 [![Documentation](https://img.shields.io/badge/Docs-Genesis%20%26%20Formula-gold?style=for-the-badge)](docs/)
 [![License MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 ---
 
-## 🌐 Akses Langsung (Live Demo)
+## 🌐 Akses Visualizer Langsung (Live Web 3D)
 
-Aplikasi visualizer dapat langsung diakses secara instan di peramban tanpa instalasi apa pun:
+Aplikasi visualizer interaktif dapat langsung diakses secara instan di peramban tanpa instalasi apa pun:
 👉 **[https://surgas.github.io/tabranij/](https://surgas.github.io/tabranij/)**
 
 ---
@@ -61,7 +63,7 @@ $$\mathbf{J} = (\mathbf{T} - \max(\mathbf{A_0}, \mathbf{I})) + \|\mathbf{I} - \m
 
 ## 🤖 3. Metrik Kuantitatif untuk AI & Algoritma
 
-Model kuantitatif dan kecerdasan buatan (*superintelligence*) dapat membaca dinamika pasar secara instan tanpa indikator *lagging* melalui 3 metrik murni Tabranij:
+Model kuantitatif dan kecerdasan buatan (*superintelligence*) dapat membaca dinamika pasar secara instan tanpa indikator *lagging* melalui 3 rasio murni Tabranij:
 
 ### 1. Rasio Efisiensi Neto ($E_N$)
 $$E_N = \frac{\text{Neto}}{\text{Julat}} \quad (0.0 \le E_N \le 1.0)$$
@@ -80,48 +82,68 @@ $$S_{\text{skew}} = \frac{\text{Atas} - \text{Bawah}}{\text{Julat}}$$
 
 ---
 
-## ⚡ 4. Fitur Aplikasi Visualizer (v3.2)
+## 📈 4. Suite Algoritmik MetaTrader 5 ([mql5/](mql5/))
 
-1. 📡 **Live Market Feed (Binance WebSocket + REST)**:
-   * Streaming tick real-time tanpa API key untuk pair: `PAXGUSDT` (Token Emas / Pax Gold), `BTCUSDT`, `ETHUSDT`, dan `SOLUSDT`.
-   * Update otomatis titik $T$, $A$, $R$, $I$ secara real-time tick-by-tick.
-2. 🔍 **Deteksi Pola & Setup Rekomendasi Otomatis**:
-   * Klasifikasi pola otomatis berdasarkan rasio Atas, Neto, dan Bawah:
-     * *Hammer / Penolakan Bawah* (Sinyal BUY)
-     * *Shooting Star / Penolakan Atas* (Sinyal SELL)
-     * *Bullish / Bearish Marubozu* (Super Momentum)
-     * *Doji / Squeeze* (Konsolidasi / Keseimbangan)
-     * *Spinning Top*
-   * Kalkulasi otomatis Entry, Stop Loss (di luar Julat dengan buffer 8%), dan Take Profit (Risk:Reward 1:2).
-3. 📐 **Dual Mode View: 3D Spatial + 2D High-Def Chart**:
-   * **3D Spasial (Three.js WebGL)**: Objek kristal lilin harga yang bisa diputar 360°, dizoom, dan memiliki hover tooltip harga.
-   * **2D Canvas Chart**: Tampilan grafik 2D datar bergaya TradingView lengkap dengan garis horizontal putus-putus untuk setiap level harga $T, A, R, I$.
-4. ✈️ **Integrasi Telegram SurgaBot**:
-   * Mengirim laporan analisis dan sinyal TARI langsung ke bot Telegram `@ayahkayabot` melalui backend serverless `/api/submit` atau clipboard copy.
-5. 📱 **Mobile Touch Gestures**:
-   * Dukungan swipe satu jari untuk rotasi 3D dan pinch dua jari untuk zoom in/out di smartphone atau tablet.
-6. 📦 **Workflow Otomasi Packaging (`pack.py`)**:
-   * Source code utama tersimpan rapi dan dapat diedit di `app.html`.
-   * Script `pack.py` secara otomatis mengompresi `app.html` menjadi chunk terenkapsulasi `p0.js` s/d `p3.js` untuk loader `index.html`.
+Repositori ini menyertakan suite MetaTrader 5 siap pakai:
+
+1. **[mql5/Include/Tabranij.mqh](mql5/Include/Tabranij.mqh)**:
+   * Pustaka C++/MQL5 native yang mendefinisikan struct `Tabranij` dan fungsi `HitungTabranij()`.
+   * Klasifikasi otomatis pola pasar: `POLA_IMPULSE_NAIK`, `POLA_IMPULSE_TURUN`, `POLA_REJECTION_ATAS`, `POLA_REJECTION_BAWAH`, dan `POLA_KOMPRESI_DOJI`.
+2. **[mql5/Indicators/Tabranij_Anatomy.mq5](mql5/Indicators/Tabranij_Anatomy.mq5)**:
+   * Indikator visual chart yang menampilkan **Live HUD Dashboard** di layar MT5 (merinci nilai $T, A, B, R, A, N, I, J$ dan rasio efisiensi) serta histogram Efisiensi Neto di subwindow.
+3. **[mql5/Experts/Tabranij_Scalper_XAUUSD.mq5](mql5/Experts/Tabranij_Scalper_XAUUSD.mq5)**:
+   * Robot trading Expert Advisor untuk Gold (XAUUSD) M1 dengan pilihan mode *Follow Trend*, *Counter Trend*, dan *Tabranij AI*.
+   * Dilengkapi pengaman keranjang (*Basket Take Profit* & *Basket Stop Loss* berbasis nominal \$ atau % ekuitas), auto-adaptive filling mode, dan notifikasi audio.
 
 ---
 
-## 🚀 5. Cara Menjalankan Secara Lokal
+## 🐍 5. Modul Data Science Python ([python/](python/))
 
-### Menjalankan Server Lokal
+Untuk keperluan riset kuantitatif, backtesting, dan machine learning menggunakan dataset historis:
+
+```python
+import pandas as pd
+from python.tabranij import Tabranij, compute_tabranij_df
+
+# 1. Analisis satu lilin harga
+candle = Tabranij(tinggi=2650.50, awal=2640.00, inti=2648.20, rendah=2638.10)
+print(candle)
+# Output: <Tabranij T=2650.50 A=2648.20 B=2640.00 R=2638.10 Awal=2640.00 N=8.20 I=2648.20 J=12.40 Efisiensi=66.1% Arah=HIJAU (Naik)>
+
+# 2. Analisis seluruh DataFrame OHLC secara tervektorisasi
+df = pd.read_csv("xauusd_m1.csv") # Kolom: Open, High, Low, Close
+df_tab = compute_tabranij_df(df)
+print(df_tab[["Tabranij_N", "Tabranij_J", "Tabranij_Efisiensi_Neto"]].head())
+```
+
+---
+
+## ⚡ 6. Fitur Aplikasi Visualizer 3D (v3.2)
+
+1. 📡 **Live Market Feed (Binance WebSocket + REST)**:
+   * Streaming candle real-time tanpa API key untuk pair: `PAXGUSDT` (Token Emas / Pax Gold), `BTCUSDT`, `ETHUSDT`, dan `SOLUSDT`.
+2. 🔍 **Deteksi Pola & Setup Rekomendasi Otomatis**:
+   * Klasifikasi otomatis formasi: Hammer, Shooting Star, Marubozu, Doji/Squeeze, Spinning Top.
+   * Kalkulasi otomatis Entry, Stop Loss (buffer 8%), dan Take Profit (RR 1:2).
+3. 📐 **Dual Mode: 3D Spatial + 2D High-Def Chart**:
+   * **3D Spasial (Three.js WebGL)**: Objek kristal lilin harga yang bisa diputar 360°, dizoom, dan memiliki hover tooltip harga.
+   * **2D Canvas Chart**: Tampilan grafik 2D datar bergaya TradingView lengkap dengan garis level harga horizontal $T, A, R, I$.
+4. ✈️ **Integrasi Telegram SurgaBot**:
+   * Mengirim laporan analisis langsung ke bot Telegram `@ayahkayabot`.
+5. 📦 **Workflow Otomasi Packaging (`pack.py`)**:
+   * Script `pack.py` mengompresi `app.html` menjadi chunk terenkapsulasi `p0.js` .. `p3.js` untuk loader cepat `index.html`.
+
+---
+
+## 🚀 7. Cara Menjalankan Secara Lokal
+
 ```bash
+# Menjalankan server HTTP lokal
 python -m http.server 8080
 ```
-Buka peramban di:
+Buka di browser:
 * `http://localhost:8080/app.html` (Master Source)
 * `http://localhost:8080/index.html` (Compressed Loader)
-
-### Alur Pengembangan & Re-Packaging
-Jika Anda melakukan perubahan pada `app.html`, kemas kembali payload untuk produksi dengan:
-```bash
-python pack.py
-```
-Output script akan memvalidasi integritas dekompresi dan memperbarui chunk `p0.js` .. `p3.js` secara otomatis.
 
 ---
 
