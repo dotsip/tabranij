@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>TABRANIJ Pro v3.2 — TARI Extended</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06080f;
+  --bg2: #0b101c;
+  --sf: #111827;
+  --sf2: #1a2332;
+  --bd: #1e2a3f;
+  --bdl: #2a3a55;
+  --fg: #e8eefc;
+  --mu: #7b8ba8;
+  --p: #38bdf8;
+  --p-glow: rgba(56,189,248,0.25);
+  --ok: #34d399;
+  --no: #f87171;
+  --wn: #fbbf24;
+  --t: #60a5fa;
+  --awal: #e2e8f0;
+  --r: #f87171;
+  --i: #4ade80;
+  --accent: #a855f7;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Inter, system-ui, sans-serif;
+  min-height: 100vh;
+  background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56,189,248,.08), transparent);
+  overflow-x: hidden;
+}
+
+/* Header */
+.hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--bd);
+  background: rgba(11,16,28,.92);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 8px; }
+.mark {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, #38bdf8, #34d399);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 11px; color: #051018;
+  font-family: 'Space Grotesk', sans-serif;
+}
+h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.05rem; font-weight: 700; }
+h1 span {
+  background: linear-gradient(90deg, #38bdf8, #34d399);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.badge {
+  font-size: .58rem; font-weight: 600; padding: 2px 6px; border-radius: 5px;
+  background: rgba(56,189,248,.15); color: var(--p); border: 1px solid rgba(56,189,248,.3);
+}
+.acts { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.btn {
+  background: var(--sf); border: 1px solid var(--bd); color: var(--fg);
+  padding: 5px 10px; border-radius: 6px; font-size: .72rem; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  transition: all .15s ease;
+}
+.btn:hover { background: var(--sf2); border-color: var(--bdl); }
+.btn.pri { background: var(--p); color: #051018; border-color: var(--p); font-weight: 600; }
+.btn.pri:hover { background: #0ea5e9; }
+.btn.tg { background: #229ed9; color: #fff; border-color: #229ed9; font-weight: 600; }
+.btn.tg:hover { background: #1b8ec5; }
+.btn.active { background: rgba(56,189,248,.2); border-color: var(--p); color: var(--p); }
+
+/* Main layout */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 390px;
+  height: calc(100vh - 50px);
+  max-width: 1750px;
+  margin: 0 auto;
+}
+@media(max-width: 1024px) {
+  .main { grid-template-columns: 1fr; height: auto; }
+}
+
+/* Canvas Viewport */
+.cav {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg2);
+  border-right: 1px solid var(--bd);
+  overflow: hidden;
+}
+#cb {
+  flex: 1;
+  min-height: 420px;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+#cb:active { cursor: grabbing; }
+#cb canvas { width: 100%!important; height: 100%!important; display: block; }
+
+#canvas2d {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: none;
+  background: #080d18;
+}
+
+/* Overlays */
+.ov {
+  position: absolute;
+  top: 10px; left: 10px; right: 10px;
+  display: flex; justify-content: space-between;
+  gap: 6px; pointer-events: none; z-index: 10;
+  flex-wrap: wrap;
+}
+.ov-left, .ov-right { display: flex; gap: 6px; flex-wrap: wrap; }
+.oc {
+  background: rgba(11,16,28,.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: .72rem;
+  pointer-events: auto;
+}
+.oc .l { color: var(--mu); font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; }
+.oc .v { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: .84rem; }
+.bb { color: var(--ok); }
+.br { color: var(--no); }
+
+.pulse-dot {
+  width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+  background: var(--ok); margin-right: 4px;
+  box-shadow: 0 0 6px var(--ok);
+  animation: pulseAnim 1.8s infinite;
+}
+@keyframes pulseAnim {
+  0% { transform: scale(.9); opacity: .7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(.9); opacity: .7; }
+}
+
+.hint {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  background: rgba(11,16,28,.82); border: 1px solid var(--bd); border-radius: 14px;
+  padding: 4px 14px; font-size: .65rem; color: var(--mu); pointer-events: none;
+  white-space: nowrap; z-index: 10;
+}
+
+/* 3D Tooltip */
+#hoverTip {
+  position: absolute;
+  display: none;
+  background: rgba(17, 24, 39, 0.94);
+  border: 1px solid var(--p);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: .7rem;
+  font-family: 'JetBrains Mono', monospace;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+}
+
+/* Sidebar */
+.sp {
+  display: flex; flex-direction: column;
+  background: var(--bg2);
+  overflow-y: auto;
+  max-height: calc(100vh - 50px);
+}
+@media(max-width: 1024px) {
+  .sp { max-height: none; }
+}
+.sec { padding: 11px 14px; border-bottom: 1px solid var(--bd); }
+.st {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.st h2 {
+  font-family: 'Space Grotesk', sans-serif; font-size: .72rem; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--mu);
+}
+.mb {
+  font-size: .62rem; padding: 2px 7px; border-radius: 4px;
+  background: var(--sf); border: 1px solid var(--bd); color: var(--fg); cursor: pointer;
+}
+.mb:hover { background: var(--sf2); }
+
+/* Live Feed Panel */
+.live-box {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.live-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.live-sel {
+  background: var(--sf2); border: 1px solid var(--bdl); color: var(--fg);
+  font-size: .72rem; font-weight: 600; border-radius: 6px; padding: 4px 8px; outline: 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Tabs & Grids */
+.tabs { display: flex; background: var(--sf); border-radius: 7px; border: 1px solid var(--bd); overflow: hidden; margin-bottom: 8px; }
+.tabs button { flex: 1; padding: 6px; border: none; background: 0; color: var(--mu); font-size: .7rem; font-weight: 600; cursor: pointer; }
+.tabs button.on { background: rgba(56,189,248,.15); color: var(--p); }
+
+.tfg { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.tf {
+  padding: 5px 2px; border-radius: 5px; border: 1px solid var(--bd);
+  background: var(--sf); color: var(--fg); font-size: .65rem; font-weight: 600;
+  cursor: pointer; text-align: center;
+}
+.tf.on { background: rgba(56,189,248,.18); border-color: var(--p); color: var(--p); }
+
+.pg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.pb {
+  padding: 5px 3px; border-radius: 5px; border: 1px solid var(--bd);
+  background: var(--sf); color: var(--fg); font-size: .65rem; cursor: pointer; text-align: center;
+}
+.pb:hover { background: var(--sf2); border-color: var(--bdl); }
+
+/* Inputs TARI */
+.tari { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
+.tari .chip { background: var(--sf); border: 1px solid var(--bd); border-radius: 6px; padding: 5px; text-align: center; }
+.tari .chip .k { font-size: .55rem; color: var(--mu); text-transform: uppercase; }
+.tari .chip .n { font-size: .7rem; font-weight: 600; }
+
+.pi { margin-bottom: 8px; }
+.ph { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.pn { font-weight: 600; font-size: .76rem; display: flex; align-items: center; gap: 5px; }
+.pd { width: 6px; height: 6px; border-radius: 50%; }
+.pn.t { color: var(--t); } .pn.t .pd { background: var(--t); box-shadow: 0 0 4px var(--t); }
+.pn.a { color: var(--awal); } .pn.a .pd { background: var(--awal); }
+.pn.r { color: var(--r); } .pn.r .pd { background: var(--r); box-shadow: 0 0 4px var(--r); }
+.pn.i { color: var(--i); } .pn.i .pd { background: var(--i); box-shadow: 0 0 4px var(--i); }
+
+.vc { display: flex; align-items: center; gap: 2px; background: var(--sf); border: 1px solid var(--bd); border-radius: 6px; padding: 1px 2px; }
+.vc input {
+  width: 80px; background: 0; border: 0; color: var(--fg);
+  font-family: 'JetBrains Mono', monospace; font-size: .78rem; font-weight: 600;
+  text-align: right; outline: 0; padding: 2px 4px;
+}
+.sb {
+  width: 22px; height: 22px; border: 0; border-radius: 4px;
+  background: var(--sf2); color: var(--fg); font-size: 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; user-select: none;
+}
+.sb:hover { background: #2a3a55; }
+.sb:active { background: var(--p); color: #051018; }
+
+input[type=range] { -webkit-appearance: none; width: 100%; height: 3px; background: var(--sf); border-radius: 2px; outline: 0; }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; background: var(--p);
+  border-radius: 50%; cursor: pointer; border: 2px solid #0ea5e9;
+}
+
+/* Rentang Grid */
+.rg { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.ri { background: var(--sf); border: 1px solid var(--bd); border-radius: 7px; padding: 6px 8px; }
+.ri .rl { font-size: .55rem; color: var(--mu); text-transform: uppercase; letter-spacing: .03em; }
+.ri .rv { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: .8rem; }
+.ri .rf { font-size: .55rem; color: var(--mu); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+.ri.full { grid-column: 1 / -1; }
+.id-ok { color: var(--ok); }
+.id-bad { color: var(--no); }
+
+/* Enhanced Identity Card */
+.id-card {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.95));
+  border: 1px solid var(--bdl);
+  border-radius: 9px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+}
+.id-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.id-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.id-status-badge {
+  font-size: .58rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.id-status-badge.ok {
+  background: rgba(52, 211, 153, 0.18);
+  color: var(--ok);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+.id-status-badge.bad {
+  background: rgba(248, 113, 113, 0.18);
+  color: var(--no);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+.id-seg-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 9px;
+  background: #000;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+}
+.id-seg-atas { background: var(--t); }
+.id-seg-neto { background: var(--ok); }
+.id-seg-bawah { background: var(--r); }
+.id-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.id-col-item {
+  background: rgba(11, 16, 28, 0.75);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 5px 6px;
+  text-align: center;
+}
+.id-col-item .lbl {
+  font-size: .55rem;
+  color: var(--mu);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.id-col-item .val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.id-col-item .pct {
+  font-size: .6rem;
+  font-weight: 600;
+}
+.id-col-item .sub {
+  font-size: .52rem;
+  color: var(--mu);
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 2px;
+}
+.id-formula-box {
+  background: rgba(6, 8, 15, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .68rem;
+  line-height: 1.4;
+  color: var(--fg);
+}
+.id-formula-res {
+  font-weight: 700;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Pattern Engine Box */
+.pattern-box {
+  background: linear-gradient(145deg, rgba(17,24,39,0.9), rgba(26,35,50,0.9));
+  border: 1px solid var(--bdl);
+  border-radius: 8px;
+  padding: 10px;
+}
+.pb-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.pb-name { font-weight: 700; font-size: .85rem; color: var(--p); }
+.pb-badge { font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
+.pb-badge.buy { background: rgba(52,211,153,.2); color: var(--ok); border: 1px solid var(--ok); }
+.pb-badge.sell { background: rgba(248,113,113,.2); color: var(--no); border: 1px solid var(--no); }
+.pb-badge.wait { background: rgba(251,191,36,.2); color: var(--wn); border: 1px solid var(--wn); }
+.pb-desc { font-size: .65rem; color: var(--mu); line-height: 1.35; margin-bottom: 8px; }
+
+.ratio-bar-container { display: flex; height: 7px; border-radius: 4px; overflow: hidden; margin-bottom: 8px; background: #111; }
+.rb-atas { background: var(--t); }
+.rb-neto { background: var(--ok); }
+.rb-bawah { background: var(--r); }
+
+.setup-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+.setup-item { background: var(--sf); border: 1px solid var(--bd); border-radius: 6px; padding: 4px 6px; text-align: center; }
+.setup-item .sl { font-size: .52rem; color: var(--mu); text-transform: uppercase; }
+.setup-item .sv { font-family: 'JetBrains Mono', monospace; font-size: .72rem; font-weight: 700; }
+
+/* History */
+.cn { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.cn button { width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--bd); background: var(--sf); color: var(--fg); cursor: pointer; }
+.cn .cl { flex: 1; text-align: center; font-size: .72rem; font-family: 'JetBrains Mono', monospace; }
+.cn .cl span { color: var(--p); }
+.hl { max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.hi { display: flex; justify-content: space-between; align-items: center; background: var(--sf); border: 1px solid var(--bd); border-radius: 6px; padding: 5px 8px; cursor: pointer; font-size: .65rem; }
+.hi:hover { border-color: var(--p); }
+.hi .ht { color: var(--mu); font-size: .55rem; }
+.hi .hv { font-family: 'JetBrains Mono', monospace; font-size: .62rem; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(60px);
+  background: var(--sf2); border: 1px solid var(--bdl); padding: 7px 16px;
+  border-radius: 8px; font-size: .75rem; z-index: 999; transition: transform .25s ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); display: flex; align-items: center; gap: 6px;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Modal Telegram */
+.modal-backdrop {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center; z-index: 200;
+}
+.modal-box {
+  background: var(--bg2); border: 1px solid var(--bdl); border-radius: 12px;
+  width: 90%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 18px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+}
+.modal-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.modal-hdr h3 { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; color: var(--p); }
+.modal-close { background: 0; border: 0; color: var(--mu); font-size: 1.2rem; cursor: pointer; }
+.preview-box {
+  background: var(--sf); border: 1px solid var(--bd); border-radius: 8px;
+  padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: .7rem;
+  line-height: 1.45; white-space: pre-wrap; margin-bottom: 12px; color: var(--fg);
+}
+.modal-input {
+  width: 100%; background: var(--sf); border: 1px solid var(--bd); border-radius: 6px;
+  color: var(--fg); font-size: .75rem; padding: 7px 10px; margin-bottom: 8px; outline: 0;
+}
+.modal-btn {
+  width: 100%; padding: 8px; border-radius: 6px; border: 0; font-weight: 600;
+  font-size: .8rem; cursor: pointer; background: #229ed9; color: #fff;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.modal-btn:hover { background: #1b8ec5; }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">
+    <div class="mark">GT</div>
+    <h1><span>TABRANIJ</span> Pro</h1>
+    <span class="badge">v3.2 · TARI Extended</span>
+  </div>
+  <div class="acts">
+    <button class="btn" id="btn2D3D" onclick="toggle2D3D()">📐 2D Chart</button>
+    <button class="btn" onclick="addC()">+ Candle</button>
+    <button class="btn" onclick="saveH()">💾</button>
+    <button class="btn" onclick="resetV()">↻</button>
+    <button class="btn" onclick="copyV()">📋</button>
+    <button class="btn tg" onclick="openTgModal()">✈️ Telegram</button>
+    <button class="btn pri" onclick="expP()">⬇ PNG</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Visualizer Viewport -->
+  <div class="cav">
+    <!-- 3D Three.js Container -->
+    <div id="cb">
+      <!-- 2D Canvas Fallback / Toggle -->
+      <canvas id="canvas2d"></canvas>
+
+      <div class="ov">
+        <div class="ov-left">
+          <div class="oc"><div class="l">Bias</div><div class="v" id="biasL">—</div></div>
+          <div class="oc"><div class="l">TF</div><div class="v" id="tfL">H1</div></div>
+          <div class="oc"><div class="l">Julat = Atas+Neto+Bawah</div><div class="v" id="idL">—</div></div>
+        </div>
+        <div class="ov-right">
+          <div class="oc" id="liveTag">
+            <div class="l">Feed Status</div>
+            <div class="v" id="liveTicker"><span class="pulse-dot"></span><span id="livePairTxt">MANUAL</span></div>
+          </div>
+          <div class="oc"><div class="l">Pola TARI</div><div class="v" id="pattL" style="color:var(--p)">—</div></div>
+        </div>
+      </div>
+
+      <div id="hoverTip"></div>
+      <div class="hint">TARI: Tinggi · Awal · Rendah · Inti · Drag rotasi 3D · Scroll zoom · Hover komponen</div>
+    </div>
+  </div>
+
+  <!-- Sidebar Controls -->
+  <div class="sp">
+    <!-- Live Market Feed -->
+    <div class="sec">
+      <div class="st">
+        <h2>Live Market Feed (Binance)</h2>
+        <span class="badge" id="wsBadge" style="background:rgba(248,113,113,.15);color:var(--no);border-color:rgba(248,113,113,.3)">OFFLINE</span>
+      </div>
+      <div class="live-box">
+        <div class="live-row">
+          <select class="live-sel" id="selPair" onchange="changePair(this.value)">
+            <option value="BTCUSDT">BTC/USDT (Bitcoin)</option>
+            <option value="ETHUSDT">ETH/USDT (Ethereum)</option>
+            <option value="PAXGUSDT" selected>PAXG/USDT (Gold Token)</option>
+            <option value="SOLUSDT">SOL/USDT (Solana)</option>
+          </select>
+          <button class="btn pri" id="btnLiveToggle" onclick="toggleLiveFeed()" style="padding:4px 10px;font-size:.68rem">⚡ Hubungkan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode & View Switch -->
+    <div class="sec">
+      <div class="st"><h2>Mode Candlestick</h2></div>
+      <div class="tabs">
+        <button class="on" id="mS" onclick="setM('single')">Single Candle</button>
+        <button id="mM" onclick="setM('multi')">Multi Series</button>
+      </div>
+    </div>
+
+    <!-- Timeframe -->
+    <div class="sec">
+      <div class="st"><h2>Timeframe</h2></div>
+      <div class="tfg">
+        <button class="tf" onclick="setTF('M1')">M1</button>
+        <button class="tf" onclick="setTF('M5')">M5</button>
+        <button class="tf" onclick="setTF('M15')">M15</button>
+        <button class="tf on" onclick="setTF('H1')">H1</button>
+        <button class="tf" onclick="setTF('H4')">H4</button>
+        <button class="tf" onclick="setTF('D1')">D1</button>
+      </div>
+    </div>
+
+    <!-- Multi Series Navigation -->
+    <div class="sec" id="mCtrl" style="display:none">
+      <div class="st"><h2>Series</h2><button class="mb" onclick="genS()">Generate</button></div>
+      <div class="cn">
+        <button onclick="selC(-1)">‹</button>
+        <div class="cl">Candle <span id="aIdx">1</span>/<span id="tC">1</span></div>
+        <button onclick="selC(1)">›</button>
+      </div>
+      <label style="font-size:.65rem;color:var(--mu);display:flex;align-items:center;gap:6px">
+        Jumlah <input type="range" id="sCnt" min="2" max="12" value="5" style="flex:1" oninput="sCntV.textContent=this.value">
+        <span id="sCntV">5</span>
+      </label>
+    </div>
+
+    <!-- Presets -->
+    <div class="sec">
+      <div class="st"><h2>Preset Bentuk Candle</h2></div>
+      <div class="pg">
+        <button class="pb" onclick="setP('bull')">Bullish</button>
+        <button class="pb" onclick="setP('bear')">Bearish</button>
+        <button class="pb" onclick="setP('doji')">Doji</button>
+        <button class="pb" onclick="setP('long')">Long Wick</button>
+        <button class="pb" onclick="setP('hammer')">Hammer</button>
+        <button class="pb" onclick="setP('maru')">Marubozu</button>
+      </div>
+    </div>
+
+    <!-- TARI Inputs -->
+    <div class="sec">
+      <div class="st"><h2>TARI — Titik</h2></div>
+      <div class="tari">
+        <div class="chip"><div class="k">T</div><div class="n" style="color:var(--t)">Tinggi</div></div>
+        <div class="chip"><div class="k">A</div><div class="n">Awal</div></div>
+        <div class="chip"><div class="k">R</div><div class="n" style="color:var(--r)">Rendah</div></div>
+        <div class="chip"><div class="k">I</div><div class="n" style="color:var(--i)">Inti</div></div>
+      </div>
+
+      <!-- T -->
+      <div class="pi">
+        <div class="ph">
+          <span class="pn t"><span class="pd"></span> Tinggi (T)</span>
+          <div class="vc">
+            <button class="sb" onmousedown="sAdj('T',-adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▼</button>
+            <input id="vT" value="2684.50" onblur="valI('T')">
+            <button class="sb" onmousedown="sAdj('T',adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▲</button>
+          </div>
+        </div>
+        <input type="range" id="sT" min="2500" max="2800" step="0.1" value="2684.50" oninput="fS('T')">
+      </div>
+
+      <!-- A -->
+      <div class="pi">
+        <div class="ph">
+          <span class="pn a"><span class="pd"></span> Awal (A)</span>
+          <div class="vc">
+            <button class="sb" onmousedown="sAdj('A',-adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▼</button>
+            <input id="vA" value="2658.30" onblur="valI('A')">
+            <button class="sb" onmousedown="sAdj('A',adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▲</button>
+          </div>
+        </div>
+        <input type="range" id="sA" min="2500" max="2800" step="0.1" value="2658.30" oninput="fS('A')">
+      </div>
+
+      <!-- R -->
+      <div class="pi">
+        <div class="ph">
+          <span class="pn r"><span class="pd"></span> Rendah (R)</span>
+          <div class="vc">
+            <button class="sb" onmousedown="sAdj('R',-adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▼</button>
+            <input id="vR" value="2641.80" onblur="valI('R')">
+            <button class="sb" onmousedown="sAdj('R',adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▲</button>
+          </div>
+        </div>
+        <input type="range" id="sR" min="2500" max="2800" step="0.1" value="2641.80" oninput="fS('R')">
+      </div>
+
+      <!-- I -->
+      <div class="pi">
+        <div class="ph">
+          <span class="pn i"><span class="pd"></span> Inti (I)</span>
+          <div class="vc">
+            <button class="sb" onmousedown="sAdj('I',-adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▼</button>
+            <input id="vI" value="2667.40" onblur="valI('I')">
+            <button class="sb" onmousedown="sAdj('I',adjStep)" onmouseup="xAdj()" onmouseleave="xAdj()">▲</button>
+          </div>
+        </div>
+        <input type="range" id="sI" min="2500" max="2800" step="0.1" value="2667.40" oninput="fS('I')">
+      </div>
+    </div>
+
+    <!-- Rentang Hitung Otomatis -->
+    <div class="sec">
+      <div class="st"><h2>Rentang (Kalkulasi Otomatis)</h2></div>
+      <div class="rg" id="hasil"></div>
+    </div>
+
+    <!-- Pattern & Setup Engine -->
+    <div class="sec">
+      <div class="st"><h2>Deteksi Pola & Setup TARI</h2></div>
+      <div class="pattern-box" id="pattBox">
+        <div class="pb-head">
+          <div class="pb-name" id="pbName">—</div>
+          <div class="pb-badge" id="pbSignal">—</div>
+        </div>
+        <div class="ratio-bar-container">
+          <div class="rb-atas" id="rbAtas" style="width:25%"></div>
+          <div class="rb-neto" id="rbNeto" style="width:50%"></div>
+          <div class="rb-bawah" id="rbBawah" style="width:25%"></div>
+        </div>
+        <div class="pb-desc" id="pbDesc">—</div>
+        <div class="setup-grid">
+          <div class="setup-item"><div class="sl">Entry</div><div class="sv" id="stEntry" style="color:var(--p)">—</div></div>
+          <div class="setup-item"><div class="sl">Stop Loss</div><div class="sv" id="stSL" style="color:var(--no)">—</div></div>
+          <div class="setup-item"><div class="sl">Target TP (1:2)</div><div class="sv" id="stTP" style="color:var(--ok)">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="sec">
+      <div class="st"><h2>History Analisis</h2><button class="mb" onclick="clrH()">Hapus</button></div>
+      <div class="hl" id="hList"><div style="text-align:center;color:var(--mu);padding:8px;font-size:.7rem">Klik 💾 untuk simpan</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Telegram Dispatch -->
+<div class="modal-backdrop" id="tgModal">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3>✈️ Kirim Analisis TARI ke Telegram</h3>
+      <button class="modal-close" onclick="closeTgModal()">✕</button>
+    </div>
+    <div style="font-size:.72rem;color:var(--mu);margin-bottom:8px">
+      Pesan akan dikirim langsung via backend SurgaBot (Pages Functions <code>/api/submit</code>) atau bot token kustom:
+    </div>
+    <div class="preview-box" id="tgPreviewTxt"></div>
+    
+    <label style="font-size:.65rem;color:var(--mu);display:block;margin-bottom:3px">Catatan Tambahan (Opsional):</label>
+    <input class="modal-input" id="tgNotes" placeholder="Contoh: Rejection di support kuat, tunggu konfirmasi M15">
+
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="modal-btn" id="btnSendTg" onclick="submitTelegram()">🚀 Kirim ke Bot Telegram</button>
+      <button class="btn" onclick="copyTgTxt()">📋 Salin Teks</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script>
+// ===== STATE: TARI points =====
+let T = 2684.50, A = 2658.30, R = 2641.80, I = 2667.40;
+let mode = 'single', tf = 'H1', currentPair = 'PAXGUSDT';
+let series = [], aIdx = 0;
+let adjStep = 0.5;
+let viewMode = '3d'; // '3d' | '2d'
+
+// Live Feed WebSocket & REST
+let ws = null, isLive = false;
+const HK = 'tabranij_tari_v32';
+let hist = JSON.parse(localStorage.getItem(HK) || '[]');
+let aInt = null, aTo = null;
+
+// ===== MATHEMATICAL ENGINE =====
+function calc() {
+  const bodyTop = Math.max(A, I);
+  const bodyBot = Math.min(A, I);
+  const Atas = Math.max(0, +(T - bodyTop).toFixed(4));
+  const Bawah = Math.max(0, +(bodyBot - R).toFixed(4));
+  const Neto = +(Math.abs(I - A).toFixed(4));
+  const Julat = +(Math.max(0, T - R).toFixed(4));
+  const sum = +(Atas + Neto + Bawah).toFixed(4);
+  const ok = Math.abs(sum - Julat) < 0.02;
+  const bull = I >= A;
+
+  // Ratios
+  const jSafe = Julat > 0 ? Julat : 1;
+  const rAtas = Atas / jSafe;
+  const rNeto = Neto / jSafe;
+  const rBawah = Bawah / jSafe;
+
+  // Pattern detection
+  let pattern = 'Standard Neutral';
+  let signal = 'WAIT';
+  let desc = 'Struktur candle seimbang tanpa penolakan ekstrem.';
+
+  if (rBawah >= 0.55 && rNeto <= 0.28 && rAtas <= 0.2) {
+    pattern = bull ? 'Hammer / Rejection Bawah' : 'Inverted Pinbar Bullish';
+    signal = 'BUY';
+    desc = 'Penolakan kuat di area rendah (Bawah > 55%). Tekanan beli mendominasi dasar harga.';
+  } else if (rAtas >= 0.55 && rNeto <= 0.28 && rBawah <= 0.2) {
+    pattern = 'Shooting Star / Rejection Atas';
+    signal = 'SELL';
+    desc = 'Penolakan tajam di area tinggi (Atas > 55%). Seller agresif menekan harga.';
+  } else if (rNeto >= 0.75) {
+    pattern = bull ? 'Bullish Marubozu (Super Momentum)' : 'Bearish Marubozu (Super Momentum)';
+    signal = bull ? 'BUY' : 'SELL';
+    desc = 'Body neto sangat tebal (> 75% Julat). Momentum tren kuat tanpa perlawanan signifikan.';
+  } else if (rNeto <= 0.12) {
+    pattern = 'Doji / Titik Keseimbangan (Squeeze)';
+    signal = 'WAIT';
+    desc = 'Harga pembukaan dan penutupan hampir identik. Pasar dalam fase konsolidasi/ragu.';
+  } else if (rAtas > 0.35 && rBawah > 0.35) {
+    pattern = 'Spinning Top / Volatile Neutral';
+    signal = 'WAIT';
+    desc = 'Kedua ekor (wick) sama panjang dengan body kecil. Volatilitas dua arah.';
+  } else {
+    pattern = bull ? 'Bullish Continuation' : 'Bearish Continuation';
+    signal = bull ? 'BUY' : 'SELL';
+    desc = bull ? 'Struktur bullish moderat dengan body berkembang.' : 'Struktur bearish moderat dengan tekanan jual.';
+  }
+
+  // Setup recommendations
+  const slBuffer = Julat * 0.08;
+  const entry = I;
+  const sl = signal === 'BUY' ? Math.max(0, R - slBuffer) : T + slBuffer;
+  const risk = Math.abs(entry - sl);
+  const tp = signal === 'BUY' ? entry + (risk * 2) : Math.max(0, entry - (risk * 2));
+
+  return {
+    bodyTop, bodyBot, Atas, Bawah, Neto, Julat, sum, ok, bull,
+    rAtas, rNeto, rBawah, pattern, signal, desc, entry, sl, tp, risk
+  };
+}
+
+// ===== PARAMETER ADJUSTMENTS =====
+function sAdj(k, d) {
+  adj(k, d);
+  aTo = setTimeout(() => aInt = setInterval(() => adj(k, d), 50), 320);
+}
+function xAdj() { clearTimeout(aTo); clearInterval(aInt); }
+function adj(k, d) {
+  const m = { T, A, R, I };
+  let v = Math.round((m[k] + d) * 100) / 100;
+  if (v < 0) v = 0;
+  setPrm(k, v);
+}
+function setPrm(k, v) {
+  if (k === 'T') T = v;
+  if (k === 'A') A = v;
+  if (k === 'R') R = v;
+  if (k === 'I') I = v;
+
+  // Keep consistency: T >= max(A,I), R <= min(A,I)
+  if (k === 'A' || k === 'I') {
+    if (v > T) T = v;
+    if (v < R) R = v;
+  }
+  if (k === 'T' && v < Math.max(A, I)) T = Math.max(A, I);
+  if (k === 'R' && v > Math.min(A, I)) R = Math.min(A, I);
+
+  syncInputs();
+  if (mode === 'multi' && series[aIdx]) series[aIdx] = { T, A, R, I };
+  draw();
+}
+function valI(k) {
+  let n = parseFloat(document.getElementById('v' + k).value.replace(',', '.'));
+  const fb = { T, A, R, I }[k];
+  setPrm(k, isNaN(n) || n < 0 ? fb : Math.round(n * 100) / 100);
+}
+function fS(k) { setPrm(k, Math.round(+document.getElementById('s' + k).value * 100) / 100); }
+
+function syncInputs() {
+  [['T', T], ['A', A], ['R', R], ['I', I]].forEach(([k, v]) => {
+    const elV = document.getElementById('v' + k);
+    const elS = document.getElementById('s' + k);
+    if (elV) elV.value = v.toFixed(2);
+    if (elS) elS.value = v;
+  });
+}
+
+function autoScaleSliders(centerPrice) {
+  const span = centerPrice > 10000 ? 1200 : centerPrice > 1000 ? 150 : 25;
+  adjStep = centerPrice > 10000 ? 5.0 : centerPrice > 1000 ? 0.5 : 0.05;
+  const mn = Math.max(0, +(centerPrice - span).toFixed(2));
+  const mx = +(centerPrice + span).toFixed(2);
+  ['T', 'A', 'R', 'I'].forEach(k => {
+    const s = document.getElementById('s' + k);
+    if (s) { s.min = mn; s.max = mx; s.step = (span / 400).toFixed(2); }
+  });
+}
+
+// ===== TIME FRAME & PRESETS =====
+function setTF(t) {
+  tf = t;
+  document.querySelectorAll('.tf').forEach(b => b.classList.toggle('on', b.textContent === t));
+  tfL.textContent = t;
+  if (isLive) {
+    stopLiveWs();
+    startLiveFeed();
+  }
+  toast('Timeframe: ' + t);
+  draw();
+}
+
+function setP(type) {
+  const mid = (T + R) / 2 || 2650;
+  const span = mid * 0.02;
+  if (type === 'bull') {
+    A = +(mid - span * 0.3).toFixed(2);
+    I = +(mid + span * 0.6).toFixed(2);
+    T = +(I + span * 0.2).toFixed(2);
+    R = +(A - span * 0.2).toFixed(2);
+  } else if (type === 'bear') {
+    A = +(mid + span * 0.5).toFixed(2);
+    I = +(mid - span * 0.4).toFixed(2);
+    T = +(A + span * 0.2).toFixed(2);
+    R = +(I - span * 0.2).toFixed(2);
+  } else if (type === 'doji') {
+    A = +(mid).toFixed(2);
+    I = +(mid + span * 0.02).toFixed(2);
+    T = +(mid + span * 0.6).toFixed(2);
+    R = +(mid - span * 0.6).toFixed(2);
+  } else if (type === 'hammer') {
+    I = +(mid + span * 0.4).toFixed(2);
+    A = +(mid + span * 0.25).toFixed(2);
+    T = +(I + span * 0.05).toFixed(2);
+    R = +(mid - span * 0.8).toFixed(2);
+  } else if (type === 'long') {
+    A = +(mid + span * 0.1).toFixed(2);
+    I = +(mid - span * 0.1).toFixed(2);
+    T = +(mid + span * 1.2).toFixed(2);
+    R = +(mid - span * 1.2).toFixed(2);
+  } else if (type === 'maru') {
+    A = +(mid - span * 0.6).toFixed(2);
+    I = +(mid + span * 0.6).toFixed(2);
+    T = +(I + span * 0.02).toFixed(2);
+    R = +(A - span * 0.02).toFixed(2);
+  }
+  T = Math.max(T, A, I);
+  R = Math.min(R, A, I);
+  autoScaleSliders(mid);
+  syncInputs();
+  if (mode === 'multi' && series[aIdx]) series[aIdx] = { T, A, R, I };
+  draw();
+  toast('Preset: ' + type.toUpperCase());
+}
+
+// ===== MODE SINGLE / MULTI =====
+function setM(m) {
+  mode = m;
+  mS.className = m === 'single' ? 'on' : '';
+  mM.className = m === 'multi' ? 'on' : '';
+  mCtrl.style.display = m === 'multi' ? 'block' : 'none';
+  if (m === 'multi' && !series.length) genS();
+  else if (m === 'multi') { loadC(); draw(); }
+  else draw();
+  toast(m === 'multi' ? 'Mode Multi Series' : 'Mode Single Candle');
+}
+function genS() {
+  const n = +sCnt.value; series = []; let b = I;
+  for (let i = 0; i < n; i++) {
+    const rng = Math.abs(b * 0.015);
+    const a = +(b + (Math.random() - .5) * rng * 0.5).toFixed(2);
+    const ii = +(b + (Math.random() - .5) * rng * 0.7).toFixed(2);
+    const t = +(Math.max(a, ii) + Math.random() * rng * 0.4).toFixed(2);
+    const r = +(Math.min(a, ii) - Math.random() * rng * 0.4).toFixed(2);
+    series.push({ T: t, A: a, R: r, I: ii });
+    b = ii;
+  }
+  aIdx = series.length - 1;
+  loadC(); updNav(); draw();
+  toast(n + ' Candle dibuat');
+}
+function addC() {
+  if (mode !== 'multi') setM('multi');
+  series.push({ T, A, R, I });
+  aIdx = series.length - 1;
+  sCnt.value = Math.min(12, series.length);
+  sCntV.textContent = series.length;
+  updNav(); draw(); toast('+1 Candle');
+}
+function selC(d) {
+  if (!series.length) return;
+  aIdx = Math.max(0, Math.min(series.length - 1, aIdx + d));
+  loadC(); updNav(); draw();
+}
+function loadC() {
+  if (!series[aIdx]) return;
+  ({ T, A, R, I } = series[aIdx]);
+  syncInputs();
+}
+function updNav() {
+  const aIdxEl = document.getElementById('aIdx');
+  if (aIdxEl) aIdxEl.textContent = series.length ? aIdx + 1 : 0;
+  tC.textContent = series.length;
+}
+
+// ===== LIVE MARKET FEED (BINANCE WEBSOCKET + REST) =====
+function changePair(p) {
+  currentPair = p;
+  livePairTxt.textContent = p;
+  if (isLive) {
+    stopLiveWs();
+    startLiveFeed();
+  } else {
+    fetchLatestKline(p);
+  }
+}
+function toggleLiveFeed() {
+  if (isLive) {
+    stopLiveWs();
+    toast('Live Feed Dimatikan');
+  } else {
+    startLiveFeed();
+  }
+}
+async function fetchLatestKline(pair) {
+  const intervalMap = { M1:'1m', M5:'5m', M15:'15m', H1:'1h', H4:'4h', D1:'1d' };
+  const interval = intervalMap[tf] || '1h';
+  try {
+    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=1`);
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const k = data[0];
+      A = parseFloat(k[1]);
+      T = parseFloat(k[2]);
+      R = parseFloat(k[3]);
+      I = parseFloat(k[4]);
+      autoScaleSliders(I);
+      syncInputs();
+      draw();
+      toast(`Data ${pair} dimuat: ${I.toFixed(2)}`);
+    }
+  } catch (err) {
+    console.error('Fetch kline error:', err);
+    toast('Gagal memuat harga: ' + err.message);
+  }
+}
+function startLiveFeed() {
+  const intervalMap = { M1:'1m', M5:'5m', M15:'15m', H1:'1h', H4:'4h', D1:'1d' };
+  const interval = intervalMap[tf] || '1h';
+  const symbol = currentPair.toLowerCase();
+  
+  wsBadge.textContent = 'CONNECTING...';
+  wsBadge.style.background = 'rgba(251,191,36,.2)';
+  wsBadge.style.color = 'var(--wn)';
+  wsBadge.style.borderColor = 'var(--wn)';
+  btnLiveToggle.textContent = 'Memutus...';
+
+  // First fetch instant snapshot
+  fetchLatestKline(currentPair);
+
+  try {
+    const streamUrl = `wss://stream.binance.com:9443/ws/${symbol}@kline_${interval}`;
+    ws = new WebSocket(streamUrl);
+    ws.onopen = () => {
+      isLive = true;
+      wsBadge.textContent = 'LIVE FEED';
+      wsBadge.style.background = 'rgba(52,211,153,.2)';
+      wsBadge.style.color = 'var(--ok)';
+      wsBadge.style.borderColor = 'var(--ok)';
+      btnLiveToggle.textContent = 'Putuskan ✕';
+      btnLiveToggle.className = 'btn';
+      livePairTxt.textContent = `${currentPair} (LIVE)`;
+      toast('Terhubung ke live market Binance!');
+    };
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg && msg.k) {
+        const k = msg.k;
+        A = parseFloat(k.o);
+        T = parseFloat(k.h);
+        R = parseFloat(k.l);
+        I = parseFloat(k.c);
+        syncInputs();
+        if (mode === 'multi' && series[aIdx]) series[aIdx] = { T, A, R, I };
+        draw();
+      }
+    };
+    ws.onerror = (e) => {
+      console.error('WS Error:', e);
+      stopLiveWs();
+    };
+    ws.onclose = () => {
+      stopLiveWs();
+    };
+  } catch (e) {
+    stopLiveWs();
+    toast('Koneksi WebSocket gagal: ' + e.message);
+  }
+}
+function stopLiveWs() {
+  if (ws) {
+    ws.onclose = null;
+    ws.close();
+    ws = null;
+  }
+  isLive = false;
+  wsBadge.textContent = 'OFFLINE';
+  wsBadge.style.background = 'rgba(248,113,113,.15)';
+  wsBadge.style.color = 'var(--no)';
+  wsBadge.style.borderColor = 'rgba(248,113,113,.3)';
+  btnLiveToggle.textContent = '⚡ Hubungkan';
+  btnLiveToggle.className = 'btn pri';
+  livePairTxt.textContent = `${currentPair} (PAUSED)`;
+}
+
+// ===== 2D CANVAS RENDERING =====
+const cv2d = document.getElementById('canvas2d');
+const ctx2d = cv2d.getContext('2d');
+
+function resize2D() {
+  const rect = box.getBoundingClientRect();
+  cv2d.width = rect.width * (window.devicePixelRatio || 1);
+  cv2d.height = rect.height * (window.devicePixelRatio || 1);
+  draw2D();
+}
+
+function draw2D() {
+  if (viewMode !== '2d') return;
+  const w = cv2d.width, h = cv2d.height;
+  ctx2d.clearRect(0, 0, w, h);
+
+  // Background grid
+  ctx2d.strokeStyle = '#141c2e';
+  ctx2d.lineWidth = 1;
+  const gridStep = 40;
+  for (let x = 0; x < w; x += gridStep) {
+    ctx2d.beginPath(); ctx2d.moveTo(x, 0); ctx2d.lineTo(x, h); ctx2d.stroke();
+  }
+  for (let y = 0; y < h; y += gridStep) {
+    ctx2d.beginPath(); ctx2d.moveTo(0, y); ctx2d.lineTo(w, y); ctx2d.stroke();
+  }
+
+  const candlesToDraw = mode === 'multi' && series.length ? series : [{ T, A, R, I }];
+  let gH = -Infinity, gL = Infinity;
+  candlesToDraw.forEach(c => {
+    gH = Math.max(gH, c.T, c.A, c.I);
+    gL = Math.min(gL, c.R, c.A, c.I);
+  });
+  const span = (gH - gL) || 1;
+  const padY = h * 0.15;
+  const yMap = (val) => padY + (h - padY * 2) * (1 - (val - gL) / span);
+
+  const num = candlesToDraw.length;
+  const spacing = Math.min(140, (w * 0.7) / num);
+  const startX = (w - (num - 1) * spacing) / 2;
+
+  candlesToDraw.forEach((c, idx) => {
+    const x = startX + idx * spacing;
+    const yT = yMap(c.T);
+    const yA = yMap(c.A);
+    const yR = yMap(c.R);
+    const yI = yMap(c.I);
+    const bodyTop = Math.min(yA, yI);
+    const bodyBot = Math.max(yA, yI);
+    const bodyH = Math.max(Math.abs(bodyBot - bodyTop), 3);
+    const bull = c.I >= c.A;
+    const isCur = (mode === 'single') || (idx === aIdx);
+
+    // Wick line
+    ctx2d.strokeStyle = bull ? '#10b981' : '#ef4444';
+    ctx2d.lineWidth = isCur ? 3 : 2;
+    ctx2d.beginPath();
+    ctx2d.moveTo(x, yT);
+    ctx2d.lineTo(x, yR);
+    ctx2d.stroke();
+
+    // Body rectangle
+    const bW = isCur ? 42 : 28;
+    ctx2d.fillStyle = bull ? '#10b981' : '#ef4444';
+    ctx2d.fillRect(x - bW / 2, bodyTop, bW, bodyH);
+
+    // Glow if active
+    if (isCur) {
+      ctx2d.strokeStyle = '#38bdf8';
+      ctx2d.lineWidth = 2;
+      ctx2d.strokeRect(x - bW / 2 - 3, bodyTop - 3, bW + 6, bodyH + 6);
+    }
+  });
+
+  // Price level dashed lines for active candle
+  const activeCandle = (mode === 'multi' && series[aIdx]) ? series[aIdx] : { T, A, R, I };
+  const levels = [
+    { label: 'T', val: activeCandle.T, color: '#60a5fa', name: 'Tinggi' },
+    { label: 'A', val: activeCandle.A, color: '#e2e8f0', name: 'Awal' },
+    { label: 'I', val: activeCandle.I, color: '#4ade80', name: 'Inti' },
+    { label: 'R', val: activeCandle.R, color: '#f87171', name: 'Rendah' },
+  ];
+
+  levels.forEach(lv => {
+    const y = yMap(lv.val);
+    ctx2d.strokeStyle = lv.color;
+    ctx2d.setLineDash([6, 4]);
+    ctx2d.lineWidth = 1.2;
+    ctx2d.beginPath();
+    ctx2d.moveTo(40, y);
+    ctx2d.lineTo(w - 120, y);
+    ctx2d.stroke();
+    ctx2d.setLineDash([]);
+
+    // Price tag badge
+    ctx2d.fillStyle = '#111827';
+    ctx2d.fillRect(w - 110, y - 11, 95, 22);
+    ctx2d.strokeStyle = lv.color;
+    ctx2d.strokeRect(w - 110, y - 11, 95, 22);
+
+    ctx2d.fillStyle = lv.color;
+    ctx2d.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx2d.fillText(`${lv.label}: ${lv.val.toFixed(2)}`, w - 104, y + 4);
+  });
+}
+
+function toggle2D3D() {
+  if (viewMode === '3d') {
+    viewMode = '2d';
+    btn2D3D.textContent = '🧊 3D View';
+    btn2D3D.classList.add('active');
+    cv2d.style.display = 'block';
+    resize2D();
+    toast('Beralih ke 2D High-Def Chart');
+  } else {
+    viewMode = '3d';
+    btn2D3D.textContent = '📐 2D Chart';
+    btn2D3D.classList.remove('active');
+    cv2d.style.display = 'none';
+    resize();
+    draw();
+    toast('Beralih ke 3D Spatial Visualizer');
+  }
+}
+
+// ===== THREE.JS 3D ENGINE =====
+const box = document.getElementById('cb');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b101c);
+scene.fog = new THREE.Fog(0x0b101c, 25, 55);
+
+const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+cam.position.set(0, 2, 18);
+
+const ren = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+box.appendChild(ren.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const kl = new THREE.DirectionalLight(0xffffff, 1.2);
+kl.position.set(6, 14, 8);
+scene.add(kl);
+
+const grid = new THREE.GridHelper(32, 32, 0x1e2a3f, 0x141c2e);
+grid.position.y = -7.5;
+scene.add(grid);
+
+const root = new THREE.Group();
+scene.add(root);
+
+// Materials
+const mBu = new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: .3, roughness: .35, transparent: true, opacity: .92 });
+const mBe = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: .3, roughness: .35, transparent: true, opacity: .92 });
+const mW = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: .4, roughness: .3 });
+const mBl = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x1e40af, emissiveIntensity: .4 });
+const mOr = new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x9a3412, emissiveIntensity: .4 });
+const mCore = new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0x38bdf8, emissiveIntensity: .35 });
+const mAwal = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, emissive: 0x64748b, emissiveIntensity: .25 });
+const mAc = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0ea5e9, emissiveIntensity: .15, transparent: true, opacity: .2 });
+
+// Interactive Raycasting & Hover Tooltip
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(-999, -999);
+const interactiveMeshes = [];
+const hoverTip = document.getElementById('hoverTip');
+
+function bC(c, x, sc, act) {
+  const g = new THREE.Group();
+  const bodyTop = Math.max(c.A, c.I);
+  const bodyBot = Math.min(c.A, c.I);
+  const vH = Math.max(c.T, bodyTop);
+  const vL = Math.min(c.R, bodyBot);
+  const mid = (vH + vL) / 2;
+  const y = v => (v - mid) * sc;
+
+  const yH = y(c.T), yL = y(c.R), yTop = y(bodyTop), yBot = y(bodyBot), yI = y(c.I), yA = y(c.A);
+  const bH = Math.max(Math.abs(yTop - yBot), 0.15);
+  const bull = c.I >= c.A;
+  const bw = act ? 1.75 : 1.3;
+
+  // Body mesh
+  const body = new THREE.Mesh(new THREE.BoxGeometry(bw, bH, bw), bull ? mBu : mBe);
+  body.position.y = (yTop + yBot) / 2;
+  body.userData = { title: bull ? 'Body (Bullish)' : 'Body (Bearish)', val: `Neto: ${Math.abs(c.I - c.A).toFixed(2)}` };
+  g.add(body);
+  interactiveMeshes.push(body);
+
+  if (act) {
+    const gl = new THREE.Mesh(new THREE.BoxGeometry(bw + .35, bH + .2, bw + .35), mAc);
+    gl.position.y = body.position.y;
+    g.add(gl);
+  }
+
+  // Upper wick: T -> bodyTop
+  if (yH - yTop > .05) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, yH - yTop, 10), mW);
+    w.position.y = yTop + (yH - yTop) / 2;
+    w.userData = { title: 'Wick Atas', val: `${(c.T - bodyTop).toFixed(2)}` };
+    g.add(w);
+    interactiveMeshes.push(w);
+  }
+
+  // Lower wick: bodyBot -> R
+  if (yBot - yL > .05) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, yBot - yL, 10), mW);
+    w.position.y = yL + (yBot - yL) / 2;
+    w.userData = { title: 'Wick Bawah', val: `${(bodyBot - c.R).toFixed(2)}` };
+    g.add(w);
+    interactiveMeshes.push(w);
+  }
+
+  // Markers
+  if (act) {
+    const mk = (yp, mat, s, title, val) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(s, 16, 16), mat);
+      m.position.y = yp;
+      m.userData = { title, val: `${val.toFixed(2)}` };
+      interactiveMeshes.push(m);
+      return m;
+    };
+    g.add(mk(yH, mBl, 0.28, 'Titik T (Tinggi)', c.T));
+    g.add(mk(yL, mOr, 0.28, 'Titik R (Rendah)', c.R));
+    g.add(mk(yI, mCore, 0.32, 'Titik I (Inti / Close)', c.I));
+    g.add(mk(yA, mAwal, 0.24, 'Titik A (Awal / Open)', c.A));
+
+    // 3D Level grid indicator
+    const planeMat = new THREE.LineDashedMaterial({ color: 0x2a3a55, dashSize: 0.3, gapSize: 0.2 });
+    const createLevelCircle = (yp) => {
+      const geo = new THREE.RingGeometry(1.8, 1.84, 32);
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x2a3a55, side: THREE.DoubleSide, transparent: true, opacity: .35 }));
+      m.rotation.x = Math.PI / 2;
+      m.position.y = yp;
+      return m;
+    };
+    g.add(createLevelCircle(yH));
+    g.add(createLevelCircle(yL));
+  }
+
+  g.position.x = x;
+  return g;
+}
+
+function draw() {
+  while (root.children.length) root.remove(root.children[0]);
+  interactiveMeshes.length = 0;
+
+  let activeC = { T, A, R, I };
+  let cc = calc();
+
+  if (mode === 'single' || !series.length) {
+    const sc = 10 / (Math.max(T, A, I) - Math.min(R, A, I) || 1);
+    root.add(bC(activeC, 0, sc, true));
+    updR(activeC, cc);
+  } else {
+    let gH = -Infinity, gL = Infinity;
+    series.forEach(c => {
+      gH = Math.max(gH, c.T, c.A, c.I);
+      gL = Math.min(gL, c.R, c.A, c.I);
+    });
+    const sc = 9 / (gH - gL || 1);
+    const sp = 2.8;
+    const tw = (series.length - 1) * sp;
+    series.forEach((c, i) => root.add(bC(c, -tw / 2 + i * sp, sc, i === aIdx)));
+    const cur = series[aIdx] || { T, A, R, I };
+    const _T = T, _A = A, _R = R, _I = I;
+    T = cur.T; A = cur.A; R = cur.R; I = cur.I;
+    activeC = cur;
+    cc = calc();
+    updR(cur, cc);
+    T = _T; A = _A; R = _R; I = _I;
+  }
+
+  if (viewMode === '2d') draw2D();
+}
+
+function updR(c, cc) {
+  const { Atas, Bawah, Neto, Julat, sum, ok, bull, rAtas, rNeto, rBawah, pattern, signal, desc, entry, sl, tp } = cc;
+
+  const pctAtas = Julat > 0 ? (rAtas * 100).toFixed(1) : '0.0';
+  const pctNeto = Julat > 0 ? (rNeto * 100).toFixed(1) : '0.0';
+  const pctBawah = Julat > 0 ? (rBawah * 100).toFixed(1) : '0.0';
+
+  const ratioAtasBody = Neto > 0 ? (Atas / Neto).toFixed(2) : (Atas > 0 ? '∞' : '0.00');
+  const ratioBawahBody = Neto > 0 ? (Bawah / Neto).toFixed(2) : (Bawah > 0 ? '∞' : '0.00');
+  const totalWick = Atas + Bawah;
+  const wickRatio = Neto > 0 ? (totalWick / Neto).toFixed(2) : '∞';
+
+  hasil.innerHTML = `
+    <div class="ri">
+      <div class="rl">Wick Atas (Rejection Top)</div>
+      <div class="rv">${Atas.toFixed(2)} <span style="font-size:.65rem;color:var(--t)">(${pctAtas}%)</span></div>
+      <div class="rf">T − max(A,I) · Rasio/Body: ${ratioAtasBody}×</div>
+    </div>
+    <div class="ri">
+      <div class="rl">Wick Bawah (Rejection Bottom)</div>
+      <div class="rv">${Bawah.toFixed(2)} <span style="font-size:.65rem;color:var(--r)">(${pctBawah}%)</span></div>
+      <div class="rf">min(A,I) − R · Rasio/Body: ${ratioBawahBody}×</div>
+    </div>
+    <div class="ri">
+      <div class="rl">Body Neto (Kekuatan Tren)</div>
+      <div class="rv" style="color:var(--p)">${Neto.toFixed(2)} <span style="font-size:.65rem;color:var(--ok)">(${pctNeto}%)</span></div>
+      <div class="rf">|I − A| · Dominasi: ${pctNeto}% Julat</div>
+    </div>
+    <div class="ri">
+      <div class="rl">Julat (Total Range)</div>
+      <div class="rv">${Julat.toFixed(2)} <span style="font-size:.65rem;color:var(--mu)">(100%)</span></div>
+      <div class="rf">T − R · Total Wick/Body: ${wickRatio}×</div>
+    </div>
+
+    <!-- Detail Kartu Identitas TABRANIJ -->
+    <div class="id-card">
+      <div class="id-hdr">
+        <div class="id-title">
+          <span>⚖️ KARTU IDENTITAS TABRANIJ</span>
+        </div>
+        <div class="id-status-badge ${ok ? 'ok' : 'bad'}">
+          ${ok ? '✓ IDENTITAS VALID (100%)' : '⚠ SELISIH NILAI'}
+        </div>
+      </div>
+
+      <div class="id-seg-bar">
+        <div class="id-seg-atas" style="width:${pctAtas}%" title="Wick Atas: ${pctAtas}%"></div>
+        <div class="id-seg-neto" style="width:${pctNeto}%" title="Body Neto: ${pctNeto}%"></div>
+        <div class="id-seg-bawah" style="width:${pctBawah}%" title="Wick Bawah: ${pctBawah}%"></div>
+      </div>
+
+      <div class="id-grid-3">
+        <div class="id-col-item" style="border-color:rgba(96,165,250,0.3)">
+          <div class="lbl" style="color:var(--t)">Wick Atas</div>
+          <div class="val" style="color:var(--t)">${Atas.toFixed(2)}</div>
+          <div class="pct" style="color:var(--t)">${pctAtas}%</div>
+          <div class="sub">T − max(A,I)</div>
+        </div>
+        <div class="id-col-item" style="border-color:rgba(74,222,128,0.3)">
+          <div class="lbl" style="color:var(--ok)">Body Neto</div>
+          <div class="val" style="color:var(--ok)">${Neto.toFixed(2)}</div>
+          <div class="pct" style="color:var(--ok)">${pctNeto}%</div>
+          <div class="sub">|I − Awal|</div>
+        </div>
+        <div class="id-col-item" style="border-color:rgba(248,113,113,0.3)">
+          <div class="lbl" style="color:var(--r)">Wick Bawah</div>
+          <div class="val" style="color:var(--r)">${Bawah.toFixed(2)}</div>
+          <div class="pct" style="color:var(--r)">${pctBawah}%</div>
+          <div class="sub">min(A,I) − R</div>
+        </div>
+      </div>
+
+      <div class="id-formula-box">
+        <div style="color:var(--mu);font-size:.58rem;text-transform:uppercase;margin-bottom:2px">Pembuktian Persamaan Matematis:</div>
+        <div style="font-size:.65rem">
+          <span style="color:var(--t)">Wick Atas [${Atas.toFixed(2)}]</span> + 
+          <span style="color:var(--ok)">Body Neto [${Neto.toFixed(2)}]</span> + 
+          <span style="color:var(--r)">Wick Bawah [${Bawah.toFixed(2)}]</span>
+        </div>
+        <div class="id-formula-res">
+          <span>= <span style="color:${ok?'var(--ok)':'var(--no)'};font-size:.78rem">${sum.toFixed(2)}</span></span>
+          <span style="color:var(--mu)">Julat Penuh (T − R): <strong style="color:var(--fg)">${Julat.toFixed(2)}</strong></span>
+          <span style="color:${ok?'var(--ok)':'var(--no)'}">${ok ? '✓ SAMA (TERBUKTI)' : '≠ TIDAK SAMA'}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  biasL.textContent = bull ? 'BULLISH' : 'BEARISH';
+  biasL.className = 'v ' + (bull ? 'bb' : 'br');
+  idL.textContent = (ok ? '✓ ' : '') + Julat.toFixed(2);
+  idL.className = 'v ' + (ok ? 'bb' : 'br');
+
+  // Update Pattern Box
+  pattL.textContent = pattern;
+  pbName.textContent = pattern;
+  pbSignal.textContent = signal;
+  pbSignal.className = 'pb-badge ' + signal.toLowerCase();
+  pbDesc.textContent = desc;
+
+  rbAtas.style.width = (rAtas * 100).toFixed(1) + '%';
+  rbNeto.style.width = (rNeto * 100).toFixed(1) + '%';
+  rbBawah.style.width = (rBawah * 100).toFixed(1) + '%';
+
+  stEntry.textContent = entry.toFixed(2);
+  stSL.textContent = sl.toFixed(2);
+  stTP.textContent = tp.toFixed(2);
+}
+
+// ===== 3D INTERACTION & GESTURES =====
+let drag = false, prev = {}, tRX = .12, tRY = .3, cRX = .12, cRY = .3, zoom = 18;
+let initialPinchDist = 0;
+
+box.onmousedown = e => {
+  drag = true;
+  prev = { x: e.clientX, y: e.clientY };
+};
+window.onmouseup = () => { drag = false; };
+window.onmousemove = e => {
+  // Raycast hover tooltip
+  const rect = box.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, cam);
+  const hits = raycaster.intersectObjects(interactiveMeshes);
+  if (hits.length > 0) {
+    const h = hits[0].object;
+    if (h.userData && h.userData.title) {
+      hoverTip.style.display = 'block';
+      hoverTip.style.left = (e.clientX - rect.left + 14) + 'px';
+      hoverTip.style.top = (e.clientY - rect.top + 14) + 'px';
+      hoverTip.innerHTML = `<strong>${h.userData.title}</strong><br><span style="color:var(--p)">${h.userData.val}</span>`;
+    }
+  } else {
+    hoverTip.style.display = 'none';
+  }
+
+  if (!drag) return;
+  tRY += (e.clientX - prev.x) * 0.007;
+  tRX = Math.max(-1, Math.min(1, tRX + (e.clientY - prev.y) * 0.007));
+  prev = { x: e.clientX, y: e.clientY };
+};
+
+// Touch gestures (Mobile support)
+box.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    drag = true;
+    prev = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  } else if (e.touches.length === 2) {
+    drag = false;
+    initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }
+}, { passive: true });
+
+box.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && drag) {
+    tRY += (e.touches[0].clientX - prev.x) * 0.008;
+    tRX = Math.max(-1, Math.min(1, tRX + (e.touches[0].clientY - prev.y) * 0.008));
+    prev = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const diff = initialPinchDist - dist;
+    zoom = Math.max(8, Math.min(35, zoom + diff * 0.04));
+    initialPinchDist = dist;
+  }
+}, { passive: true });
+
+box.addEventListener('touchend', () => { drag = false; }, { passive: true });
+
+box.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom = Math.max(8, Math.min(35, zoom + e.deltaY * 0.012));
+}, { passive: false });
+
+function resetV() {
+  tRX = .12; tRY = .3; zoom = mode === 'multi' ? 20 : 16;
+  toast('Sudut pandang di-reset');
+}
+function copyV() {
+  const cc = calc();
+  const text = `TARI [${currentPair} · ${tf}]\n` +
+    `Titik: T:${T.toFixed(2)} A:${A.toFixed(2)} R:${R.toFixed(2)} I:${I.toFixed(2)}\n` +
+    `Rentang: Atas:${cc.Atas.toFixed(2)} Bawah:${cc.Bawah.toFixed(2)} Neto:${cc.Neto.toFixed(2)} Julat:${cc.Julat.toFixed(2)}\n` +
+    `Pola: ${cc.pattern} (${cc.signal})\n` +
+    `Setup: Entry:${cc.entry.toFixed(2)} SL:${cc.sl.toFixed(2)} TP:${cc.tp.toFixed(2)}`;
+  navigator.clipboard.writeText(text).then(() => toast('Analisis TARI disalin!'));
+}
+function expP() {
+  const a = document.createElement('a');
+  a.download = `tabranij-tari-${currentPair}-${tf}-${Date.now()}.png`;
+  a.href = ren.domElement.toDataURL('image/png');
+  a.click();
+  toast('Gambar PNG berhasil diekspor!');
+}
+
+// ===== HISTORY (LOCAL STORAGE) =====
+function saveH() {
+  const c = calc();
+  hist.unshift({
+    id: Date.now(),
+    time: new Date().toLocaleString('id-ID'),
+    pair: currentPair,
+    tf, mode, T, A, R, I,
+    pattern: c.pattern,
+    signal: c.signal,
+    series: mode === 'multi' ? JSON.parse(JSON.stringify(series)) : null
+  });
+  if (hist.length > 30) hist.pop();
+  localStorage.setItem(HK, JSON.stringify(hist));
+  renH();
+  toast('Analisis disimpan ke History!');
+}
+function loadH(id) {
+  const e = hist.find(h => h.id === id);
+  if (!e) return;
+  tf = e.tf || 'H1'; setTF(tf);
+  if (e.pair) { currentPair = e.pair; selPair.value = e.pair; livePairTxt.textContent = e.pair; }
+  if (e.series && e.series.length) {
+    series = e.series; aIdx = series.length - 1;
+    mode = 'multi'; setM('multi'); loadC(); updNav();
+  } else {
+    T = e.T; A = e.A; R = e.R; I = e.I;
+    mode = 'single'; setM('single'); syncInputs();
+  }
+  autoScaleSliders((T + R) / 2);
+  draw();
+  toast('Data history dimuat');
+}
+function delH(id) {
+  hist = hist.filter(h => h.id !== id);
+  localStorage.setItem(HK, JSON.stringify(hist));
+  renH();
+}
+function clrH() {
+  hist = []; localStorage.setItem(HK, '[]'); renH(); toast('History dikosongkan');
+}
+function renH() {
+  if (!hist.length) {
+    hList.innerHTML = '<div style="text-align:center;color:var(--mu);padding:8px;font-size:.7rem">Klik 💾 untuk simpan</div>';
+    return;
+  }
+  hList.innerHTML = hist.map(h => `
+    <div class="hi" onclick="loadH(${h.id})">
+      <div>
+        <div class="ht">${h.time} · ${h.pair || 'TARI'} · ${h.tf} · ${h.signal || ''}</div>
+        <div class="hv">T:${h.T.toFixed(1)} A:${h.A.toFixed(1)} R:${h.R.toFixed(1)} I:${h.I.toFixed(1)}</div>
+      </div>
+      <button onclick="event.stopPropagation();delH(${h.id})" style="background:0;border:0;color:var(--mu);cursor:pointer">✕</button>
+    </div>
+  `).join('');
+}
+
+// ===== TELEGRAM DISPATCH MODAL =====
+function openTgModal() {
+  const cc = calc();
+  const preview = [
+    `📐 TABRANIJ PRO (TARI) — SINYAL & ANALISIS`,
+    `━━━━━━━━━━━━━━━━━━━━━`,
+    `💱 Pair: ${currentPair} | TF: ${tf}`,
+    `Bias: ${cc.bull ? '🟢 BULLISH' : '🔴 BEARISH'}`,
+    `🔍 Pola TARI: ${cc.pattern}`,
+    `Sinyal: ${cc.signal === 'BUY' ? '🚀 BUY' : cc.signal === 'SELL' ? '🔻 SELL' : '⏳ WAIT'}`,
+    ``,
+    `📌 Titik TARI:`,
+    `• T (Tinggi): ${T.toFixed(2)}`,
+    `• A (Awal): ${A.toFixed(2)}`,
+    `• R (Rendah): ${R.toFixed(2)}`,
+    `• I (Inti): ${I.toFixed(2)}`,
+    ``,
+    `📏 Rentang: Atas ${cc.Atas.toFixed(2)} | Neto ${cc.Neto.toFixed(2)} | Bawah ${cc.Bawah.toFixed(2)}`,
+    `🎯 Setup: Entry ${cc.entry.toFixed(2)} | SL ${cc.sl.toFixed(2)} | TP ${cc.tp.toFixed(2)}`
+  ].join('\n');
+
+  tgPreviewTxt.textContent = preview;
+  tgModal.style.display = 'flex';
+}
+function closeTgModal() {
+  tgModal.style.display = 'none';
+}
+function copyTgTxt() {
+  navigator.clipboard.writeText(tgPreviewTxt.textContent).then(() => toast('Teks Telegram disalin!'));
+}
+async function submitTelegram() {
+  const cc = calc();
+  const notes = tgNotes.value.trim();
+  const payload = {
+    form_type: 'tari',
+    pair: currentPair,
+    timeframe: tf,
+    bias: cc.bull ? 'BULLISH' : 'BEARISH',
+    pattern: cc.pattern,
+    signal: cc.signal,
+    T, A, R, I,
+    atas: cc.Atas,
+    bawah: cc.Bawah,
+    neto: cc.Neto,
+    julat: cc.Julat,
+    entry: cc.entry,
+    stoploss: cc.sl,
+    takeprofit: cc.tp,
+    notes: notes
+  };
+
+  btnSendTg.disabled = true;
+  btnSendTg.textContent = 'Mengirim sinyal...';
+
+  try {
+    const res = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (res.ok && json.success) {
+      toast('✅ Sinyal TARI berhasil terkirim ke Telegram @ayahkayabot!');
+      closeTgModal();
+    } else {
+      toast(json.error || 'Server Pages: konfigurasi bot Telegram diperlukan.');
+    }
+  } catch (err) {
+    // Fallback if offline/standalone
+    copyTgTxt();
+    toast('Offline / Local: Teks sinyal disalin ke Clipboard untuk dikirim ke Telegram!');
+  } finally {
+    btnSendTg.disabled = false;
+    btnSendTg.textContent = '🚀 Kirim ke Bot Telegram';
+  }
+}
+
+// ===== RESIZE & ANIMATION LOOP =====
+function resize() {
+  const w = box.clientWidth, h = box.clientHeight;
+  cam.aspect = w / h;
+  cam.updateProjectionMatrix();
+  ren.setSize(w, h);
+  if (viewMode === '2d') resize2D();
+}
+window.onresize = resize;
+
+function toast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Initialization
+autoScaleSliders((T + R) / 2);
+resize();
+renH();
+draw();
+
+(function anim() {
+  requestAnimationFrame(anim);
+  if (viewMode === '3d') {
+    cRX += (tRX - cRX) * 0.1;
+    cRY += (tRY - cRY) * 0.1;
+    root.rotation.x = cRX;
+    root.rotation.y = cRY;
+    if (!drag) tRY += 0.0015; // Slow ambient orbit
+    cam.position.z += (zoom - cam.position.z) * 0.08;
+    ren.render(scene, cam);
+  }
+})();
+</script>
+</body>
+</html>
