@@ -1,15 +1,69 @@
 //+------------------------------------------------------------------+
 //|                                  Tabranij_Scalper_XAUUSD.mq5      |
-//|                         Master MQL5 Gold Specialist - Production |
+//|                         Master MQL5 Gold Specialist - Standalone  |
 //|               Genesis Riwayat Angka Faktual Informasi Keuangan   |
 //+------------------------------------------------------------------+
 #property copyright "Surgas & Master MQL5 Gold Specialist"
 #property link      "https://github.com/surgas/tabranij"
-#property version   "2.00"
+#property version   "2.10"
 #property strict
 
 #include <Trade\Trade.mqh>
-#include "..\Include\Tabranij.mqh"
+
+//+------------------------------------------------------------------+
+//| STRUKTUR DATA ANATOMI LILIN TABRANIJ (EMBEDDED)                  |
+//+------------------------------------------------------------------+
+struct Tabranij
+{
+   double T;       // Tinggi (High)
+   double Awal;    // Awal (Open)
+   double R;       // Rendah (Low)
+   double I;       // Inti (Close / Live Price)
+   double A;       // Atas = max(Awal, Inti)
+   double B;       // Bawah = min(Awal, Inti)
+   double N;       // Neto = |Inti - Awal|
+   double J;       // Julat = Tinggi - Rendah
+   double EkorAtas;   // T - A
+   double EkorBawah;  // B - R
+   bool   IsNaik;
+   double VektorNeto;
+   double EfisiensiNeto;
+   double RasioPenolakanAtas;
+   double RasioPenolakanBawah;
+};
+
+Tabranij HitungTabranij(string symbol, ENUM_TIMEFRAMES timeframe, int shift)
+{
+   Tabranij tab;
+   ZeroMemory(tab);
+   MqlRates rates[];
+   ArraySetAsSeries(rates, true);
+
+   if(CopyRates(symbol, timeframe, shift, 1, rates) < 1) return tab;
+
+   tab.T    = rates[0].high;
+   tab.R    = rates[0].low;
+   tab.Awal = rates[0].open;
+   tab.I    = rates[0].close;
+
+   tab.A = MathMax(tab.Awal, tab.I);
+   tab.B = MathMin(tab.Awal, tab.I);
+   tab.N = MathAbs(tab.I - tab.Awal);
+   tab.J = tab.T - tab.R;
+
+   tab.EkorAtas  = tab.T - tab.A;
+   tab.EkorBawah = tab.B - tab.R;
+   tab.VektorNeto = tab.I - tab.Awal;
+   tab.IsNaik     = (tab.I >= tab.Awal);
+
+   if(tab.J > 0)
+   {
+      tab.EfisiensiNeto       = tab.N / tab.J;
+      tab.RasioPenolakanAtas  = tab.EkorAtas / tab.J;
+      tab.RasioPenolakanBawah = tab.EkorBawah / tab.J;
+   }
+   return tab;
+}
 
 CTrade trade;
 
@@ -17,8 +71,7 @@ CTrade trade;
 enum ENUM_ENTRY_MODE
 {
    MODE_FOLLOW_TREND,    // Trend: Neto Hijau = BUY, Neto Merah = SELL
-   MODE_COUNTER_TREND,   // Reversal: Neto Hijau = SELL, Neto Merah = BUY
-   MODE_TABRANIJ_AI      // Algoritmik AI: Impuls = Follow, Penolakan Ekor = Reversal
+   MODE_COUNTER_TREND    // Reversal: Neto Hijau = SELL, Neto Merah = BUY
 };
 
 // 2. Pilihan Mode Basket TP & SL
@@ -284,16 +337,6 @@ void OnTick()
       // Counter: Neto Hijau (Naik) -> SELL | Neto Merah (Turun) -> BUY
       execute_buy  = !t1.IsNaik;
       execute_sell = t1.IsNaik;
-   }
-   else if(InpEntryMode == MODE_TABRANIJ_AI)
-   {
-      // Klasifikasi Dinamika Pasar Tabranij
-      ENUM_POLA_TABRANIJ pola = KlasifikasiPolaTabranij(t1);
-
-      if(pola == POLA_IMPULSE_NAIK)        execute_buy  = true;
-      else if(pola == POLA_IMPULSE_TURUN)   execute_sell = true;
-      else if(pola == POLA_REJECTION_BAWAH) execute_buy  = true; // Penolakan bawah -> Pantulan naik
-      else if(pola == POLA_REJECTION_ATAS)  execute_sell = true; // Penolakan atas -> Pantulan turun
    }
 
    // EKSEKUSI BUY
