@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
-//|                                  Tabranij_Scalper_XAUUSD.mq5      |
-//|                         Master MQL5 Gold Specialist - Standalone  |
-//|               Genesis Riwayat Angka Faktual Informasi Keuangan   |
+//|                          Grafik_Tabranij_Scalper_XAUUSD.mq5       |
+//|                    Master MQL5 Gold Specialist - Standalone       |
+//|            Genesis Riwayat Angka Faktual Informasi Keuangan       |
 //+------------------------------------------------------------------+
 #property copyright "Surgas & Master MQL5 Gold Specialist"
 #property link      "https://github.com/surgas/tabranij"
@@ -11,16 +11,16 @@
 #include <Trade\Trade.mqh>
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA ANATOMI LILIN TABRANIJ (EMBEDDED)                  |
+//| STRUKTUR DATA ANATOMI GRAFIK TABRANIJ (EMBEDDED)                  |
 //+------------------------------------------------------------------+
 struct Tabranij
 {
    double T;       // Tinggi (High)
-   double Awal;    // Awal (Open)
-   double R;       // Rendah (Low)
-   double I;       // Inti (Close / Live Price)
    double A;       // Atas = max(Awal, Inti)
    double B;       // Bawah = min(Awal, Inti)
+   double R;       // Rendah (Low)
+   double Awal;    // Awal (Open)
+   double I;       // Inti (Close / Live Price)
    double N;       // Neto = |Inti - Awal|
    double J;       // Julat = Tinggi - Rendah
    double EkorAtas;   // T - A
@@ -401,18 +401,18 @@ void OnTick()
    // EKSEKUSI BUY
    if(execute_buy)
    {
-      if(SafeExecute(true, InpLotSize, "Tabranij_Buy"))
+      if(SafeExecute(true, InpLotSize, "GT Buy"))
       {
-         Print("[Tabranij] BUY Eksekusi | Neto: ", t1.N, " | Efisiensi: ", DoubleToString(t1.EfisiensiNeto*100, 1), "%");
+         Print("[GT] BUY Eksekusi | Neto: ", t1.N, " | Efisiensi: ", DoubleToString(t1.EfisiensiNeto*100, 1), "%");
          if(InpEnableSound && !MQLInfoInteger(MQL_TESTER)) PlaySound(InpSoundBuy);
       }
    }
    // EKSEKUSI SELL
    else if(execute_sell)
    {
-      if(SafeExecute(false, InpLotSize, "Tabranij_Sell"))
+      if(SafeExecute(false, InpLotSize, "GT Sell"))
       {
-         Print("[Tabranij] SELL Eksekusi | Neto: ", t1.N, " | Efisiensi: ", DoubleToString(t1.EfisiensiNeto*100, 1), "%");
+         Print("[GT] SELL Eksekusi | Neto: ", t1.N, " | Efisiensi: ", DoubleToString(t1.EfisiensiNeto*100, 1), "%");
          if(InpEnableSound && !MQLInfoInteger(MQL_TESTER)) PlaySound(InpSoundSell);
       }
    }
