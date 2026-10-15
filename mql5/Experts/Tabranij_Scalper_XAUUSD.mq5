@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Surgas & Master MQL5 Gold Specialist"
 #property link      "https://github.com/surgas/tabranij"
-#property version   "2.10"
+#property version   "2.30"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -84,24 +84,28 @@ enum ENUM_BASKET_TYPE
 //+------------------------------------------------------------------+
 //| PARAMETER INPUT                                                  |
 //+------------------------------------------------------------------+
-input group "=== [1. STRATEGI ANATOMI TABRANIJ] ==="
+input group "=== [1. PENGATURAN KERANJANG & SAPU BERSIH] ==="
+input bool              InpCloseAllMagic       = true;         // SAPU BERSIH: Hitung & Tutup SEMUA Posisi Lama?
+input bool              InpAllSymbols          = false;        // Pantau Semua Pair? (false = Hanya XAUUSD)
+
+input group "=== [2. STRATEGI ANATOMI TABRANIJ] ==="
 input ENUM_ENTRY_MODE   InpEntryMode         = MODE_COUNTER_TREND; // Mode Arah Sinyal
 input double            InpMinNetoPoints     = 0.0;                // Filter Minimal Panjang Neto (0 = Bebas)
 input ulong             InpMagicNumber       = 999111;             // Magic Number
 input double            InpLotSize           = 0.01;               // Ukuran Lot Tiap Menit
 input int               InpMaxOpenPositions  = 50;                 // Maksimal Posisi Terbuka Bersamaan
 
-input group "=== [2. TARGET BASKET TAKE PROFIT] ==="
+input group "=== [3. TARGET BASKET TAKE PROFIT] ==="
 input ENUM_BASKET_TYPE  InpBasketType        = BASKET_USD;         // Tipe Perhitungan (USD atau %)
 input double            InpTargetUSD         = 5.0;                // Target Profit ($ Tunai)
 input double            InpTargetPercent     = 0.5;                // Target Profit (% Saldo)
 
-input group "=== [3. BATAS RUGI / BASKET STOP LOSS] ==="
+input group "=== [4. BATAS RUGI / BASKET STOP LOSS] ==="
 input bool              InpUseBasketSL       = true;               // Aktifkan Batas Rugi Keranjang?
 input double            InpMaxLossUSD        = 15.0;               // Batas Maksimal Rugi ($ Tunai)
 input double            InpMaxLossPercent    = 1.5;                // Batas Maksimal Rugi (% Saldo)
 
-input group "=== [4. NOTIFIKASI SUARA] ==="
+input group "=== [5. NOTIFIKASI SUARA] ==="
 input bool              InpEnableSound       = true;               // Aktifkan Suara?
 input string            InpSoundBuy          = "ok.wav";           // Suara Order BUY
 input string            InpSoundSell         = "expert.wav";       // Suara Order SELL
@@ -162,21 +166,67 @@ bool SafeExecute(bool is_buy, double volume, string comment)
 }
 
 //+------------------------------------------------------------------+
-//| Tutup Seluruh Posisi Keranjang                                   |
+//| Filter Validasi Posisi (Bisa Sapu Bersih Semua Magic Number)     |
+//+------------------------------------------------------------------+
+bool IsPositionEligible(ulong ticket)
+{
+   if(ticket <= 0) return false;
+
+   string pos_symbol = PositionGetString(POSITION_SYMBOL);
+   long   pos_magic  = PositionGetInteger(POSITION_MAGIC);
+
+   // Cek simbol
+   if(!InpAllSymbols && pos_symbol != _Symbol) return false;
+
+   // JIKA SAPU BERSIH DIAKTIFKAN: SEMUA POSISI IKUT DIHITUNG & DITUTUP!
+   if(InpCloseAllMagic) return true;
+
+   // Jika tidak sapu bersih, hanya EA ini atau posisi manual (Magic 0)
+   if(pos_magic == (long)InpMagicNumber || pos_magic == 0) return true;
+
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Tutup Seluruh Posisi Keranjang (Dengan Retry Loop 5x)            |
 //+------------------------------------------------------------------+
 void CloseAllPositions()
 {
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   int max_attempts = 5;
+
+   for(int attempt = 1; attempt <= max_attempts; attempt++)
    {
-      ulong ticket = PositionGetTicket(i);
-      if(ticket > 0)
+      int still_open = 0;
+
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
       {
-         if(PositionGetString(POSITION_SYMBOL) == _Symbol && 
-            PositionGetInteger(POSITION_MAGIC) == InpMagicNumber)
+         ulong ticket = PositionGetTicket(i);
+         if(ticket > 0 && IsPositionEligible(ticket))
          {
-            trade.PositionClose(ticket);
+            long magic = PositionGetInteger(POSITION_MAGIC);
+            
+            if(trade.PositionClose(ticket))
+            {
+               Print("[CloseAll] Berhasil menutup tiket #", ticket, " (Magic: ", magic, ")");
+            }
+            else
+            {
+               Print("[CloseAll] Percobaan ", attempt, " Gagal tiket #", ticket, 
+                     " - Retcode: ", trade.ResultRetcode(), " (", trade.ResultRetcodeDescription(), ")");
+               still_open++;
+            }
          }
       }
+
+      // Jika seluruh posisi sudah bersih tertutup, keluar dari loop
+      if(still_open == 0)
+      {
+         Print("[CloseAll] SELURUH POSISI TELAH BERSIH TERTUTUP!");
+         break;
+      }
+
+      // Beri jeda 150ms agar server broker memperbarui status sebelum mencoba lagi
+      Sleep(150);
    }
 }
 
@@ -186,23 +236,19 @@ void CloseAllPositions()
 void ManageBasketProfitAndLoss(const Tabranij &t)
 {
    double total_profit = 0.0;
-   int open_count = 0;
+   int eligible_count = 0;
 
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       ulong ticket = PositionGetTicket(i);
-      if(ticket > 0)
+      if(ticket > 0 && IsPositionEligible(ticket))
       {
-         if(PositionGetString(POSITION_SYMBOL) == _Symbol && 
-            PositionGetInteger(POSITION_MAGIC) == InpMagicNumber)
-         {
-            total_profit += (PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP));
-            open_count++;
-         }
+         total_profit += (PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP));
+         eligible_count++;
       }
    }
 
-   if(open_count == 0)
+   if(eligible_count == 0)
    {
       Comment("");
       return;
@@ -231,7 +277,7 @@ void ManageBasketProfitAndLoss(const Tabranij &t)
       "Neto   (N): %.2f | Julat  (J): %.2f (Efisiensi: %.1f%%)\n" +
       "Ekor Atas : %.2f | Ekor Bwh: %.2f\n" +
       "--------------------------------------\n" +
-      "Posisi Terbuka : %d Posisi\n" +
+      "Posisi Terbuka : %d Posisi (Mode Sapu Bersih: %s)\n" +
       "Floating Net   : $%.2f\n" +
       "Target TP      : +$%.2f\n" +
       "Batas Rugi (SL): %s\n",
@@ -239,7 +285,7 @@ void ManageBasketProfitAndLoss(const Tabranij &t)
       t.Awal, t.I,
       t.N, t.J, (t.EfisiensiNeto * 100.0),
       t.EkorAtas, t.EkorBawah,
-      open_count, 
+      eligible_count, (InpCloseAllMagic ? "SEMUA ORDER" : "EA & MANUAL"),
       total_profit, 
       target_tp_money,
       (InpUseBasketSL ? StringFormat("-$%.2f", max_loss_money) : "NON-AKTIF")
@@ -249,8 +295,14 @@ void ManageBasketProfitAndLoss(const Tabranij &t)
    // A. KONDISI TP TERCAPAI
    if(total_profit >= target_tp_money)
    {
-      Print(">>> [BASKET TP!] Profit: $", DoubleToString(total_profit, 2), " >= Target: $", DoubleToString(target_tp_money, 2));
+      Print("======================================================");
+      Print(">>> [BASKET TP TERCAPAI!] Profit: $", DoubleToString(total_profit, 2), 
+            " >= Target: $", DoubleToString(target_tp_money, 2));
+      Print(">>> Eksekusi Sapu Bersih seluruh ", eligible_count, " posisi...");
+      Print("======================================================");
+
       CloseAllPositions();
+
       if(InpEnableSound && !MQLInfoInteger(MQL_TESTER)) PlaySound(InpSoundTP);
       return;
    }
@@ -258,8 +310,14 @@ void ManageBasketProfitAndLoss(const Tabranij &t)
    // B. KONDISI SL TERSENTUH
    if(InpUseBasketSL && total_profit <= -max_loss_money)
    {
-      Print(">>> [BASKET SL!] Rugi: $", DoubleToString(total_profit, 2), " <= Batas: -$", DoubleToString(max_loss_money, 2));
+      Print("======================================================");
+      Print(">>> [BASKET SL TERSENTUH!] Rugi: $", DoubleToString(total_profit, 2), 
+            " <= Batas: -$", DoubleToString(max_loss_money, 2));
+      Print(">>> CUT LOSS DARURAT: Sapu bersih seluruh posisi!");
+      Print("======================================================");
+
       CloseAllPositions();
+
       if(InpEnableSound && !MQLInfoInteger(MQL_TESTER)) PlaySound(InpSoundSL);
       return;
    }
@@ -273,7 +331,8 @@ int OnInit()
    InitTradeEngine();
    last_m1_bar_time = 0;
 
-   Print(">>> [Tabranij Scalper] Aktif pada ", _Symbol, " M1. Mode: ", EnumToString(InpEntryMode));
+   Print(">>> [Tabranij Scalper] Aktif pada ", _Symbol, " M1. Mode: ", EnumToString(InpEntryMode), 
+         " | Sapu Bersih Semua Order: ", (InpCloseAllMagic ? "YA" : "TIDAK"));
    return INIT_SUCCEEDED;
 }
 
@@ -294,7 +353,7 @@ void OnTick()
    // 1. Hitung Struktur Tabranij Terbaru (Bar 1)
    Tabranij t1 = HitungTabranij(_Symbol, PERIOD_M1, 1);
 
-   // 2. Kelola TP & SL Basket Real-Time
+   // 2. Kelola TP & SL Basket Real-Time (Sapu Bersih Semua Posisi)
    ManageBasketProfitAndLoss(t1);
 
    // 3. Cek Pergantian Menit
@@ -358,4 +417,3 @@ void OnTick()
       }
    }
 }
-//+------------------------------------------------------------------+
