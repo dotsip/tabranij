@@ -271,7 +271,7 @@ void ManageBasketProfitAndLoss(const Tabranij &t)
 
    // Tampilkan Dashboard Lengkap Tabranij di Chart
    string status_text = StringFormat(
-      "=== [LAB KRISTAL TABRANIJ MONITOR] ===\n" +
+      "=== [GRAFIK TABRANIJ MONITOR] ===\n" +
       "Tinggi (T): %.2f | Rendah (R): %.2f\n" +
       "Awal   (A): %.2f | Inti   (I): %.2f\n" +
       "Neto   (N): %.2f | Julat  (J): %.2f (Efisiensi: %.1f%%)\n" +
