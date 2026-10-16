@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Surgas & Master MQL5 Gold Specialist"
 #property link      "https://github.com/surgas/tabranij"
-#property version   "3.00"
+#property version   "3.10"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -127,7 +127,7 @@ enum ENUM_ENTRY_MODE
    MODE_REJECTION_EKOR,  // 3. Mode Ekor: Berdasarkan Ekor Atas (eka) & Ekor Bawah (ekb)
    MODE_BREAKOUT,        // 4. Breakout: Inti Tembus Tinggi (T) / Rendah (R) Sebelumnya
    MODE_REVERSAL,        // 5. Reversal: Sweep T/R (False Break) & Engulfing Neto
-   MODE_SMART_HYBRID     // 6. Smart Hybrid: Gabungan Otomatis Breakout, Reversal, Ekor & Neto
+   MODE_SMART_HYBRID     // 6. Smart Hybrid: Otomatis Breakout, Reversal, Ekor & Neto (100% Aktif)
 };
 
 // 2. Pilihan Logika Arah Ekor Atas (eka) & Ekor Bawah (ekb)
@@ -152,7 +152,7 @@ enum ENUM_EXEC_ORDER_TYPE
 // 4. Pilihan Mode Kompas Multi-Timeframe (MTF)
 enum ENUM_MTF_MODE
 {
-   MTF_OFF,                  // Non-Aktif (Bebas Entry Tanpa Filter TF Besar)
+   MTF_OFF,                  // Non-Aktif (Bebas Entry Tanpa Ditahan TF Besar)
    MTF_LIVE_BAR0,            // Live Bar 0 HTF (Searah Neto Candle TF Besar Saat Ini)
    MTF_CLOSED_BAR1,          // Closed Bar 1 HTF (Searah Candle TF Besar yang Sudah Tutup)
    MTF_BREAKOUT_OR_REVERSAL  // Pintar: Ikuti Breakout / Reversal Ekor pada TF Besar
@@ -169,9 +169,9 @@ enum ENUM_BASKET_DIRECTION
 // 6. Pilihan Mode Jarak Antar Order / Pip Step (Pilar 2: Layering Filter)
 enum ENUM_STEP_MODE
 {
-   STEP_AVERAGING_ONLY,      // Averaging: Hanya Tambah Layer Saat Floating Minus Sejauh X Poin
+   STEP_FREE,                // Bebas: Eksekusi Setiap Ada Sinyal Bar (Tanpa Ditahan Jarak)
    STEP_MIN_DISTANCE,        // Minimum Distance: Jarak Minimal X Poin dari Order Terakhir
-   STEP_FREE                 // Bebas: Tanpa Filter Jarak (Buka Setiap Ada Sinyal)
+   STEP_AVERAGING_ONLY       // Averaging: Hanya Tambah Layer Saat Floating Minus Sejauh X Poin
 };
 
 // 7. Pilihan Mode Progresi Lot Layer (Pilar 2: Lot Sizing)
@@ -215,18 +215,19 @@ input bool                  InpAllSymbols            = false;                   
 input ulong                 InpMagicNumber           = 999111;                  // Magic Number
 
 input group "=== [2. PROYEKSI KOTAK MASA DEPAN & PENDING ORDER (+1, +2, +3)] ==="
+input bool                  InpAutoFollowChartTF     = true;                    // Otomatis Ikuti Timeframe Chart (M1/M5/M15/M30/H1)?
 input ENUM_EXEC_ORDER_TYPE  InpExecOrderType         = EXEC_MARKET_LIMIT_STOP;  // Mode Eksekusi (Market + Pending Limit/Stop)
 input int                   InpHistoryBarsToRead     = 4;                       // Jumlah Kotak Historis ke Belakang (misal 4 kotak)
 input int                   InpFutureBarsToProject   = 3;                       // Jumlah Kotak Masa Depan Diproyeksikan (misal 3 kotak)
 input bool                  InpDrawFutureBoxes       = true;                    // Gambar Kotak Proyeksi Masa Depan di Kanan Chart?
 input bool                  InpRefreshPendingEachBar = true;                    // Perbarui Pending Order Otomatis Tiap Pergantian Bar?
-input color                 InpColorFutureBull       = clrMediumSeaGreen;       // Warna Kotak Proyeksi Masa Depan NAIK
-input color                 InpColorFutureBear       = clrIndianRed;            // Warna Kotak Proyeksi Masa Depan TURUN
+input color                 InpColorFutureBull       = clrLimeGreen;            // Warna Kotak Proyeksi Masa Depan NAIK
+input color                 InpColorFutureBear       = clrDeepPink;             // Warna Kotak Proyeksi Masa Depan TURUN
 
 input group "=== [3. KONTROL LAYER, JARAK ORDER, & PROGRESI LOT (PILAR 2)] ==="
 input ENUM_BASKET_DIRECTION InpBasketDirection       = BASKET_MIXED_ANTI_LOCK;  // Mode Arah Keranjang (Anti-Kunci / 1 Arah / Pisah)
-input ENUM_STEP_MODE        InpStepMode              = STEP_MIN_DISTANCE;       // Mode Filter Jarak Antar Posisi (Pip Step)
-input double                InpMinStepPoints         = 100.0;                   // Jarak Minimal Antar Order (Poin, 0 = Bebas)
+input ENUM_STEP_MODE        InpLayerStepMode         = STEP_FREE;               // Mode Filter Jarak Antar Posisi (STEP_FREE = Langsung Entry)
+input double                InpLayerMinStepPoints    = 50.0;                    // Jarak Minimal Antar Order (Jika Mode Distance/Averaging)
 input ENUM_LOT_MODE         InpLotMode               = LOT_FIXED;               // Mode Ukuran Lot Layer
 input double                InpLotSize               = 0.01;                    // Ukuran Lot Awal (Layer 1)
 input double                InpLotAddValue           = 0.01;                    // Nilai Tambah Lot (Jika Mode LOT_ADDER)
@@ -237,16 +238,16 @@ input double                InpOvertakeLotFactor     = 1.5;                     
 input int                   InpMaxOpenPositions      = 50;                      // Maksimal Posisi Terbuka Bersamaan
 
 input group "=== [4. PILIHAN MODE SINYAL ANATOMI TABRANIJ (PILAR 1)] ==="
-input ENUM_TIMEFRAMES       InpExecTF                = PERIOD_CURRENT;          // Timeframe Eksekusi (CURRENT = Ikuti Chart M1/M5/M15/M30/H1)
+input ENUM_TIMEFRAMES       InpCustomTF              = PERIOD_CURRENT;          // Timeframe Manual (Jika InpAutoFollowChartTF = false)
 input ENUM_ENTRY_MODE       InpEntryMode             = MODE_SMART_HYBRID;       // Mode Sinyal Anatomi Tabranij
 input ENUM_EKOR_DIRECTION   InpEkorDirection         = EKOR_EKA_BUY_EKB_SELL;   // Arah Sinyal Ekor: eka=Buy/ekb=Sell atau ekb=Buy/eka=Sell
 input double                InpMinNetoPoints         = 0.0;                     // Filter Minimal Panjang Neto (Poin, 0 = Bebas)
-input double                InpMinEfficiencyPct      = 50.0;                    // Minimal Efisiensi Neto % (Utk Trend & Breakout)
-input double                InpMinRejectionPct       = 45.0;                    // Minimal Rasio Ekor % (Utk eka / ekb & Sweep)
-input int                   InpLookbackBars          = 5;                       // Jumlah Bar Acuan Tinggi (T) & Rendah (R) (Breakout/Reversal)
+input double                InpMinEfficiencyRatio    = 35.0;                    // Minimal Efisiensi Neto % (Utk Trend & Breakout)
+input double                InpMinRejectionRatio     = 35.0;                    // Minimal Rasio Ekor % (Utk eka / ekb & Sweep)
+input int                   InpLookbackBars          = 3;                       // Jumlah Bar Acuan Tinggi (T) & Rendah (R) (Breakout/Reversal)
 
 input group "=== [5. KOMPAS MULTI-TIMEFRAME (MTF TABRANIJ)] ==="
-input ENUM_MTF_MODE         InpMTFMode               = MTF_LIVE_BAR0;           // Mode Filter Kompas TF Besar
+input ENUM_MTF_MODE         InpCompassMTFMode        = MTF_OFF;                 // Mode Filter Kompas TF Besar (MTF_OFF = Langsung Entry)
 input ENUM_TIMEFRAMES       InpTrendTF               = PERIOD_M15;              // Timeframe Kompas Tren Besar (Otomatis Naik Jika Chart >= M15)
 input int                   InpHTFLookbackBars       = 3;                       // Jumlah Bar Acuan Breakout di TF Besar
 
@@ -283,18 +284,20 @@ input string                InpSoundTP               = "alert.wav";             
 input string                InpSoundSL               = "stops.wav";             // Suara Saat Batas Rugi Terkena
 
 datetime last_exec_bar_time   = 0;
-string   g_last_signal_info   = "Menunggu Pergantian Bar...";
+string   g_last_signal_info   = "Siap Mengeksekusi Sinyal...";
 string   g_last_order_comment = "-";
-string   g_mtf_status_info    = "NON-AKTIF";
-string   g_timeline_info      = "-";
-string   g_future_boxes_info  = "-";
+string   g_mtf_status_info    = "MTF OFF (Bebas 2 Arah)";
+string   g_timeline_info      = "Memuat Riwayat Timeframe...";
+string   g_future_boxes_info  = "Menghitung Kotak Proyeksi...";
 
 //+------------------------------------------------------------------+
-//| Dapatkan Timeframe Eksekusi Aktif (Otomatis Ikuti Chart _Period) |
+//| Dapatkan Timeframe Eksekusi Aktif (Selalu Ikuti Chart _Period)   |
 //+------------------------------------------------------------------+
 ENUM_TIMEFRAMES GetExecTF()
 {
-   return (InpExecTF == PERIOD_CURRENT) ? _Period : InpExecTF;
+   if(InpAutoFollowChartTF || InpCustomTF == PERIOD_CURRENT)
+      return _Period;
+   return InpCustomTF;
 }
 
 //+------------------------------------------------------------------+
@@ -339,13 +342,14 @@ string GetShortBarTimeLabel(datetime bar_time, ENUM_TIMEFRAMES tf)
 //+------------------------------------------------------------------+
 bool CalculateFutureProjections(Tabranij &future_boxes[], string &out_timeline_str, string &out_future_str)
 {
-   ENUM_TIMEFRAMES exec_tf = GetExecTF();
-   int hist_count   = MathMax(2, InpHistoryBarsToRead);
-   int future_count = MathMax(1, MathMin(10, InpFutureBarsToProject));
+   // Visual proyeksi selalu mengikuti Timeframe Chart yang sedang dibuka (_Period: M1, M5, M15, M30, H1, dst.)
+   ENUM_TIMEFRAMES tf = GetExecTF();
+   int hist_count     = MathMax(2, InpHistoryBarsToRead);
+   int future_count   = MathMax(1, MathMin(10, InpFutureBarsToProject));
    ArrayResize(future_boxes, future_count);
 
-   Tabranij t0 = HitungTabranij(_Symbol, exec_tf, 0); // Kotak Live sekarang pada TF aktif
-   if(t0.Waktu == 0) return false;
+   Tabranij t0 = HitungTabranij(_Symbol, tf, 0); // Kotak Live sekarang pada TF aktif
+   if(t0.Waktu == 0 || t0.I <= 0.0) return false;
 
    double sum_weight      = 0.0;
    double weighted_vektor = 0.0;
@@ -356,10 +360,9 @@ bool CalculateFutureProjections(Tabranij &future_boxes[], string &out_timeline_s
 
    string past_labels = "";
 
-   // Baca kotak-kotak masa lalu dari paling belakang ke terbaru pada TF aktif (M1, M5, M15, M30, H1, dst.)
    for(int s = hist_count; s >= 1; s--)
    {
-      Tabranij th = HitungTabranij(_Symbol, exec_tf, s);
+      Tabranij th = HitungTabranij(_Symbol, tf, s);
       if(th.Waktu == 0) continue;
 
       double w = (double)(hist_count - s + 1); // Bobot bertingkat
@@ -370,27 +373,40 @@ bool CalculateFutureProjections(Tabranij &future_boxes[], string &out_timeline_s
       weighted_eka    += th.EkorAtas   * w;
       weighted_ekb    += th.EkorBawah  * w;
 
-      past_labels += GetShortBarTimeLabel(th.Waktu, exec_tf) + (s > 1 ? ", " : "");
+      past_labels += GetShortBarTimeLabel(th.Waktu, tf) + (s > 1 ? ", " : "");
    }
 
-   if(sum_weight <= 0.0) return false;
+   // Fallback ke t0 jika riwayat TF baru sedang sinkronisasi di MT5
+   if(sum_weight <= 0.0)
+   {
+      sum_weight      = 1.0;
+      weighted_vektor = t0.VektorNeto;
+      weighted_neto   = MathMax(t0.N, 20.0 * _Point);
+      weighted_julat  = MathMax(t0.J, 40.0 * _Point);
+      weighted_eka    = MathMax(t0.EkorAtas,  10.0 * _Point);
+      weighted_ekb    = MathMax(t0.EkorBawah, 10.0 * _Point);
+      past_labels     = "Sync...";
+   }
 
    double avg_vektor = weighted_vektor / sum_weight;
-   double avg_neto   = weighted_neto   / sum_weight;
-   double avg_julat  = weighted_julat  / sum_weight;
-   double avg_eka    = weighted_eka    / sum_weight;
-   double avg_ekb    = weighted_ekb    / sum_weight;
+   double avg_neto   = MathMax(weighted_neto / sum_weight, 15.0 * _Point);
+   double avg_julat  = MathMax(weighted_julat / sum_weight, 30.0 * _Point);
+   double avg_eka    = MathMax(weighted_eka   / sum_weight,  8.0 * _Point);
+   double avg_ekb    = MathMax(weighted_ekb   / sum_weight,  8.0 * _Point);
 
    // Gabungkan kecepatan historis (65%) dengan kecepatan Live Bar 0 saat ini (35%)
    double live_step_vektor = (avg_vektor * 0.65) + (t0.VektorNeto * 0.35);
 
-   // Pastikan ukuran body proyeksi minimal 35% dari rata-rata Neto agar kotak masa depan proporsional
+   // Pastikan ukuran body proyeksi minimal 45% dari rata-rata Neto agar kotak masa depan tampak jelas di semua TF
    double dir_sign = (live_step_vektor >= 0.0) ? 1.0 : -1.0;
-   if(MathAbs(live_step_vektor) < avg_neto * 0.35)
-      live_step_vektor = dir_sign * MathMax(avg_neto * 0.50, 10.0 * _Point);
+   if(MathAbs(live_step_vektor) < avg_neto * 0.45)
+      live_step_vektor = dir_sign * MathMax(avg_neto * 0.55, 15.0 * _Point);
 
-   int    period_sec = PeriodSeconds(exec_tf);
-   double next_awal  = t0.I; // Titik Awal kotak +1 dimulai dari Inti Live saat ini
+   int period_sec = PeriodSeconds(tf);
+   if(period_sec <= 0) period_sec = PeriodSeconds(_Period);
+   if(period_sec <= 0) period_sec = 60;
+
+   double next_awal = t0.I; // Titik Awal kotak +1 dimulai dari Inti Live saat ini
 
    out_future_str = "";
    string future_labels = "";
@@ -400,7 +416,7 @@ bool CalculateFutureProjections(Tabranij &future_boxes[], string &out_timeline_s
       Tabranij fp;
       ZeroMemory(fp);
 
-      fp.Waktu = t0.Waktu + ((k + 1) * period_sec);
+      fp.Waktu = t0.Waktu + (datetime)((k + 1) * period_sec);
       fp.Awal  = NormalizeDouble(next_awal, _Digits);
 
       double damp   = MathPow(0.92, k);
@@ -431,15 +447,15 @@ bool CalculateFutureProjections(Tabranij &future_boxes[], string &out_timeline_s
       future_boxes[k] = fp;
       next_awal       = fp.I;
 
-      string f_lbl = GetShortBarTimeLabel(fp.Waktu, exec_tf);
+      string f_lbl = GetShortBarTimeLabel(fp.Waktu, tf);
       future_labels  += f_lbl + (k < future_count - 1 ? ", " : "");
       out_future_str += StringFormat("[+%d %s %s T:%.2f R:%.2f] ",
                                      k + 1, f_lbl, (fp.IsNaik ? "NAIK" : "TURUN"), fp.T, fp.R);
    }
 
    out_timeline_str = StringFormat("[%s] Riwayat(%s) -> LIVE[%s] -> Kedepan(%s)",
-                                   EnumToString(exec_tf), past_labels,
-                                   GetShortBarTimeLabel(t0.Waktu, exec_tf), future_labels);
+                                   EnumToString(tf), past_labels,
+                                   GetShortBarTimeLabel(t0.Waktu, tf), future_labels);
    return true;
 }
 
@@ -467,98 +483,88 @@ void DrawFutureBoxesOnChart(const Tabranij &future_boxes[])
       return;
    }
 
-   ENUM_TIMEFRAMES exec_tf = GetExecTF();
+   ENUM_TIMEFRAMES chart_tf = _Period;
    int count      = ArraySize(future_boxes);
-   int period_sec = PeriodSeconds(exec_tf);
+   int period_sec = PeriodSeconds(chart_tf);
+   if(period_sec <= 0) period_sec = 60;
+
+   datetime bar0_time = iTime(_Symbol, chart_tf, 0);
+   if(bar0_time == 0) bar0_time = TimeCurrent();
 
    for(int k = 0; k < count; k++)
    {
       Tabranij fp = future_boxes[k];
-      if(fp.Waktu == 0) continue;
+      if(fp.T <= 0.0 || fp.R <= 0.0) continue;
 
-      string wick_name  = FUTURE_OBJ_PREFIX + "Wick_"  + IntegerToString(k + 1);
+      // Pastikan koordinat waktu selalu sejajar dengan grid bar chart aktif (_Period)
+      datetime t_start = bar0_time + (datetime)((k + 1) * period_sec);
+      datetime t_end   = bar0_time + (datetime)((k + 2) * period_sec);
+
+      string range_name = FUTURE_OBJ_PREFIX + "Range_" + IntegerToString(k + 1);
       string body_name  = FUTURE_OBJ_PREFIX + "Body_"  + IntegerToString(k + 1);
-      string top_name   = FUTURE_OBJ_PREFIX + "Top_"   + IntegerToString(k + 1);
-      string bot_name   = FUTURE_OBJ_PREFIX + "Bot_"   + IntegerToString(k + 1);
+      string wick_name  = FUTURE_OBJ_PREFIX + "Wick_"  + IntegerToString(k + 1);
       string label_name = FUTURE_OBJ_PREFIX + "Label_" + IntegerToString(k + 1);
 
       color  box_color = fp.IsNaik ? InpColorFutureBull : InpColorFutureBear;
-      string time_lbl  = GetShortBarTimeLabel(fp.Waktu, exec_tf);
+      string time_lbl  = GetShortBarTimeLabel(t_start, chart_tf);
       string tooltip   = StringFormat("Proyeksi +%d (%s) | T: %.2f | A: %.2f | B: %.2f | R: %.2f",
                                       k + 1, time_lbl, fp.T, fp.A, fp.B, fp.R);
 
-      // PENTING: Di MT5, koordinat waktu objek pada M5/M15/M30 harus berjarak minimal 1 PeriodSeconds penuh
-      // agar tidak dibulatkan menjadi 0 piksel oleh sumbu X chart!
-      datetime next_bar_time = fp.Waktu + (datetime)period_sec;
-
-      // 1. Garis Ekor / Julat Vertikal (T ke R)
-      if(ObjectFind(0, wick_name) < 0)
+      // 1. Kotak Bingkai Luar Julat (Tinggi T ke Rendah R) - Outline Putus-Putus
+      if(ObjectFind(0, range_name) < 0)
       {
-         ObjectCreate(0, wick_name, OBJ_TREND, 0, fp.Waktu, fp.T, fp.Waktu, fp.R);
-         ObjectSetInteger(0, wick_name, OBJPROP_RAY_RIGHT, false);
-         ObjectSetInteger(0, wick_name, OBJPROP_RAY_LEFT, false);
-         ObjectSetInteger(0, wick_name, OBJPROP_SELECTABLE, false);
+         ObjectCreate(0, range_name, OBJ_RECTANGLE, 0, t_start, fp.T, t_end, fp.R);
+         ObjectSetInteger(0, range_name, OBJPROP_FILL, false);
+         ObjectSetInteger(0, range_name, OBJPROP_BACK, false);
+         ObjectSetInteger(0, range_name, OBJPROP_SELECTABLE, false);
       }
-      ObjectMove(0, wick_name, 0, fp.Waktu, fp.T);
-      ObjectMove(0, wick_name, 1, fp.Waktu, fp.R);
-      ObjectSetInteger(0, wick_name, OBJPROP_COLOR, box_color);
-      ObjectSetInteger(0, wick_name, OBJPROP_STYLE, STYLE_DOT);
-      ObjectSetInteger(0, wick_name, OBJPROP_WIDTH, 2);
-      ObjectSetString(0, wick_name, OBJPROP_TOOLTIP, tooltip);
+      ObjectMove(0, range_name, 0, t_start, fp.T);
+      ObjectMove(0, range_name, 1, t_end,   fp.R);
+      ObjectSetInteger(0, range_name, OBJPROP_COLOR, box_color);
+      ObjectSetInteger(0, range_name, OBJPROP_STYLE, STYLE_DOT);
+      ObjectSetInteger(0, range_name, OBJPROP_WIDTH, 1);
+      ObjectSetString(0, range_name, OBJPROP_TOOLTIP, tooltip);
 
-      // 2. Kotak Badan Neto (A ke B) dengan lebar tepat 1 Bar penuh agar selalu muncul di M1, M5, M15, M30, H1!
+      // 2. Kotak Dalam Badan Neto (Atas A ke Bawah B) - Blok Berwarna
       if(ObjectFind(0, body_name) < 0)
       {
-         ObjectCreate(0, body_name, OBJ_RECTANGLE, 0, fp.Waktu, fp.A, next_bar_time, fp.B);
+         ObjectCreate(0, body_name, OBJ_RECTANGLE, 0, t_start, fp.A, t_end, fp.B);
          ObjectSetInteger(0, body_name, OBJPROP_FILL, true);
          ObjectSetInteger(0, body_name, OBJPROP_BACK, true);
          ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
       }
-      ObjectMove(0, body_name, 0, fp.Waktu, fp.A);
-      ObjectMove(0, body_name, 1, next_bar_time, fp.B);
+      ObjectMove(0, body_name, 0, t_start, fp.A);
+      ObjectMove(0, body_name, 1, t_end,   fp.B);
       ObjectSetInteger(0, body_name, OBJPROP_COLOR, box_color);
-      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(0, body_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, body_name, OBJPROP_WIDTH, 2);
       ObjectSetString(0, body_name, OBJPROP_TOOLTIP, tooltip);
 
-      // 3. Garis Atap Tinggi (T) & Lantai Rendah (R) per Kotak Proyeksi
-      if(ObjectFind(0, top_name) < 0)
+      // 3. Garis Vertikal Ekor (T ke R)
+      if(ObjectFind(0, wick_name) < 0)
       {
-         ObjectCreate(0, top_name, OBJ_TREND, 0, fp.Waktu, fp.T, next_bar_time, fp.T);
-         ObjectSetInteger(0, top_name, OBJPROP_RAY_RIGHT, false);
-         ObjectSetInteger(0, top_name, OBJPROP_RAY_LEFT, false);
-         ObjectSetInteger(0, top_name, OBJPROP_SELECTABLE, false);
+         ObjectCreate(0, wick_name, OBJ_TREND, 0, t_start, fp.T, t_start, fp.R);
+         ObjectSetInteger(0, wick_name, OBJPROP_RAY_RIGHT, false);
+         ObjectSetInteger(0, wick_name, OBJPROP_RAY_LEFT, false);
+         ObjectSetInteger(0, wick_name, OBJPROP_SELECTABLE, false);
       }
-      ObjectMove(0, top_name, 0, fp.Waktu, fp.T);
-      ObjectMove(0, top_name, 1, next_bar_time, fp.T);
-      ObjectSetInteger(0, top_name, OBJPROP_COLOR, box_color);
-      ObjectSetInteger(0, top_name, OBJPROP_STYLE, STYLE_SOLID);
-      ObjectSetInteger(0, top_name, OBJPROP_WIDTH, 2);
-      ObjectSetString(0, top_name, OBJPROP_TOOLTIP, "T+" + IntegerToString(k + 1) + ": " + DoubleToString(fp.T, _Digits));
+      ObjectMove(0, wick_name, 0, t_start, fp.T);
+      ObjectMove(0, wick_name, 1, t_start, fp.R);
+      ObjectSetInteger(0, wick_name, OBJPROP_COLOR, box_color);
+      ObjectSetInteger(0, wick_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, wick_name, OBJPROP_WIDTH, 2);
+      ObjectSetString(0, wick_name, OBJPROP_TOOLTIP, tooltip);
 
-      if(ObjectFind(0, bot_name) < 0)
-      {
-         ObjectCreate(0, bot_name, OBJ_TREND, 0, fp.Waktu, fp.R, next_bar_time, fp.R);
-         ObjectSetInteger(0, bot_name, OBJPROP_RAY_RIGHT, false);
-         ObjectSetInteger(0, bot_name, OBJPROP_RAY_LEFT, false);
-         ObjectSetInteger(0, bot_name, OBJPROP_SELECTABLE, false);
-      }
-      ObjectMove(0, bot_name, 0, fp.Waktu, fp.R);
-      ObjectMove(0, bot_name, 1, next_bar_time, fp.R);
-      ObjectSetInteger(0, bot_name, OBJPROP_COLOR, box_color);
-      ObjectSetInteger(0, bot_name, OBJPROP_STYLE, STYLE_SOLID);
-      ObjectSetInteger(0, bot_name, OBJPROP_WIDTH, 2);
-      ObjectSetString(0, bot_name, OBJPROP_TOOLTIP, "R+" + IntegerToString(k + 1) + ": " + DoubleToString(fp.R, _Digits));
-
-      // 4. Label Kecil di Atas Kotak Proyeksi (+1, +2, +3)
+      // 4. Label Teks di Atas Kotak Proyeksi (+1, +2, +3)
       if(ObjectFind(0, label_name) < 0)
       {
-         ObjectCreate(0, label_name, OBJ_TEXT, 0, fp.Waktu, fp.T);
+         ObjectCreate(0, label_name, OBJ_TEXT, 0, t_start, fp.T);
          ObjectSetInteger(0, label_name, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
          ObjectSetString(0, label_name, OBJPROP_FONT, "Consolas");
          ObjectSetInteger(0, label_name, OBJPROP_FONTSIZE, 8);
          ObjectSetInteger(0, label_name, OBJPROP_SELECTABLE, false);
       }
-      ObjectMove(0, label_name, 0, fp.Waktu, fp.T + (5 * _Point));
+      ObjectMove(0, label_name, 0, t_start, fp.T + (5 * _Point));
       ObjectSetInteger(0, label_name, OBJPROP_COLOR, box_color);
       ObjectSetString(0, label_name, OBJPROP_TEXT, StringFormat("+%d(%s)", k + 1, time_lbl));
    }
@@ -689,29 +695,29 @@ bool CheckLayerAndStepPermission(bool is_buy, bool is_breakout_or_reversal,
          return true;
    }
 
-   if(InpStepMode == STEP_FREE || InpMinStepPoints <= 0.0)
+   if(InpLayerStepMode == STEP_FREE || InpLayerMinStepPoints <= 0.0)
       return true;
 
-   double min_dist_price = InpMinStepPoints * _Point;
+   double min_dist_price = InpLayerMinStepPoints * _Point;
 
    if(is_buy && exp.buy_count > 0)
    {
       double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-      if(InpStepMode == STEP_AVERAGING_ONLY)
+      if(InpLayerStepMode == STEP_AVERAGING_ONLY)
       {
          double dist_pts = (exp.lowest_buy_price - ask) / _Point;
          if((exp.lowest_buy_price - ask) < min_dist_price)
          {
-            out_block_reason = StringFormat("Ditahan Averaging BUY (Jarak %.0f < %.0f pts)", dist_pts, InpMinStepPoints);
+            out_block_reason = StringFormat("Menunggu Jarak Averaging BUY (%.0f < %.0f pts)", dist_pts, InpLayerMinStepPoints);
             return false;
          }
       }
-      else if(InpStepMode == STEP_MIN_DISTANCE)
+      else if(InpLayerStepMode == STEP_MIN_DISTANCE)
       {
          double dist_pts = MathAbs(ask - exp.last_buy_price) / _Point;
          if(MathAbs(ask - exp.last_buy_price) < min_dist_price)
          {
-            out_block_reason = StringFormat("Ditahan Jarak BUY (%.0f < %.0f pts)", dist_pts, InpMinStepPoints);
+            out_block_reason = StringFormat("Menunggu Jarak BUY (%.0f < %.0f pts)", dist_pts, InpLayerMinStepPoints);
             return false;
          }
       }
@@ -719,21 +725,21 @@ bool CheckLayerAndStepPermission(bool is_buy, bool is_breakout_or_reversal,
    else if(!is_buy && exp.sell_count > 0)
    {
       double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      if(InpStepMode == STEP_AVERAGING_ONLY)
+      if(InpLayerStepMode == STEP_AVERAGING_ONLY)
       {
          double dist_pts = (bid - exp.highest_sell_price) / _Point;
          if((bid - exp.highest_sell_price) < min_dist_price)
          {
-            out_block_reason = StringFormat("Ditahan Averaging SELL (Jarak %.0f < %.0f pts)", dist_pts, InpMinStepPoints);
+            out_block_reason = StringFormat("Menunggu Jarak Averaging SELL (%.0f < %.0f pts)", dist_pts, InpLayerMinStepPoints);
             return false;
          }
       }
-      else if(InpStepMode == STEP_MIN_DISTANCE)
+      else if(InpLayerStepMode == STEP_MIN_DISTANCE)
       {
          double dist_pts = MathAbs(bid - exp.last_sell_price) / _Point;
          if(MathAbs(bid - exp.last_sell_price) < min_dist_price)
          {
-            out_block_reason = StringFormat("Ditahan Jarak SELL (%.0f < %.0f pts)", dist_pts, InpMinStepPoints);
+            out_block_reason = StringFormat("Menunggu Jarak SELL (%.0f < %.0f pts)", dist_pts, InpLayerMinStepPoints);
             return false;
          }
       }
@@ -773,6 +779,12 @@ bool SafeExecute(bool is_buy, double volume, string comment)
       }
    }
 
+   if(!success)
+   {
+      Print("[SafeExecute Gagal] ", (is_buy ? "BUY " : "SELL "), volume, " Lot | Retcode: ",
+            trade.ResultRetcode(), " (", trade.ResultRetcodeDescription(), ")");
+   }
+
    return success;
 }
 
@@ -799,10 +811,10 @@ void DeleteAllPendingOrders()
 //+------------------------------------------------------------------+
 //| Pasang Pending Order Limit / Stop Berdasarkan Kotak Masa Depan   |
 //+------------------------------------------------------------------+
-void PlaceFuturePendingOrders(bool is_buy_signal, double lot, const Tabranij &future_boxes[])
+int PlaceFuturePendingOrders(bool is_buy_signal, double lot, const Tabranij &future_boxes[])
 {
    int count = ArraySize(future_boxes);
-   if(count <= 0) return;
+   if(count <= 0) return 0;
 
    bool use_limit = (InpExecOrderType == EXEC_MARKET_AND_LIMIT ||
                      InpExecOrderType == EXEC_MARKET_LIMIT_STOP ||
@@ -814,15 +826,20 @@ void PlaceFuturePendingOrders(bool is_buy_signal, double lot, const Tabranij &fu
                      InpExecOrderType == EXEC_PENDING_STOP_ONLY ||
                      InpExecOrderType == EXEC_PENDING_BOTH_ONLY);
 
-   if(!use_limit && !use_stop) return;
+   if(!use_limit && !use_stop) return 0;
 
    ENUM_TIMEFRAMES exec_tf = GetExecTF();
-   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ask    = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double bid    = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double spread = MathMax(ask - bid, 10.0 * _Point);
 
-   long   stop_lvl_pts = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
-   double min_offset   = MathMax((double)stop_lvl_pts * _Point, 25.0 * _Point);
-   double step_gap     = MathMax(InpMinStepPoints * 0.5 * _Point, 30.0 * _Point);
+   long   stop_lvl_pts   = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+   long   freeze_lvl_pts = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+   double broker_min     = (double)MathMax(stop_lvl_pts, freeze_lvl_pts) * _Point;
+   double min_offset     = MathMax(broker_min + spread, 35.0 * _Point);
+   double step_gap       = MathMax(InpLayerMinStepPoints * 0.5 * _Point, 35.0 * _Point);
+
+   int placed_count = 0;
 
    for(int k = 0; k < count; k++)
    {
@@ -841,7 +858,10 @@ void PlaceFuturePendingOrders(bool is_buy_signal, double lot, const Tabranij &fu
 
             string comment = StringFormat("GT BuyLim R+%d (%s)", k + 1, t_lbl);
             if(trade.BuyLimit(lot, lim_price, _Symbol, 0, 0, ORDER_TIME_GTC, 0, comment))
+            {
+               placed_count++;
                Print("[Pending GT] ", comment, " dipasang @ ", DoubleToString(lim_price, _Digits));
+            }
          }
 
          // 2. BUY STOP di Proyeksi Tinggi (T) Kotak Masa Depan (+1, +2, +3)
@@ -854,7 +874,10 @@ void PlaceFuturePendingOrders(bool is_buy_signal, double lot, const Tabranij &fu
 
             string comment = StringFormat("GT BuyStop T+%d (%s)", k + 1, t_lbl);
             if(trade.BuyStop(lot, stp_price, _Symbol, 0, 0, ORDER_TIME_GTC, 0, comment))
+            {
+               placed_count++;
                Print("[Pending GT] ", comment, " dipasang @ ", DoubleToString(stp_price, _Digits));
+            }
          }
       }
       else // Sinyal SELL
@@ -869,7 +892,10 @@ void PlaceFuturePendingOrders(bool is_buy_signal, double lot, const Tabranij &fu
 
             string comment = StringFormat("GT SellLim T+%d (%s)", k + 1, t_lbl);
             if(trade.SellLimit(lot, lim_price, _Symbol, 0, 0, ORDER_TIME_GTC, 0, comment))
+            {
+               placed_count++;
                Print("[Pending GT] ", comment, " dipasang @ ", DoubleToString(lim_price, _Digits));
+            }
          }
 
          // 2. SELL STOP di Proyeksi Rendah (R) Kotak Masa Depan (+1, +2, +3)
@@ -882,10 +908,15 @@ void PlaceFuturePendingOrders(bool is_buy_signal, double lot, const Tabranij &fu
 
             string comment = StringFormat("GT SellStop R+%d (%s)", k + 1, t_lbl);
             if(trade.SellStop(lot, stp_price, _Symbol, 0, 0, ORDER_TIME_GTC, 0, comment))
+            {
+               placed_count++;
                Print("[Pending GT] ", comment, " dipasang @ ", DoubleToString(stp_price, _Digits));
+            }
          }
       }
    }
+
+   return placed_count;
 }
 
 //+------------------------------------------------------------------+
@@ -980,7 +1011,7 @@ void EvaluateMTFCompass(bool &allow_buy, bool &allow_sell, string &mtf_info)
    allow_buy  = true;
    allow_sell = true;
 
-   if(InpMTFMode == MTF_OFF)
+   if(InpCompassMTFMode == MTF_OFF)
    {
       mtf_info = "MTF OFF (Bebas 2 Arah)";
       return;
@@ -989,9 +1020,14 @@ void EvaluateMTFCompass(bool &allow_buy, bool &allow_sell, string &mtf_info)
    ENUM_TIMEFRAMES trend_tf = GetEffectiveTrendTF();
    string tf_name = EnumToString(trend_tf);
 
-   if(InpMTFMode == MTF_LIVE_BAR0)
+   if(InpCompassMTFMode == MTF_LIVE_BAR0)
    {
       Tabranij t_htf = HitungTabranij(_Symbol, trend_tf, 0);
+      if(t_htf.Waktu == 0)
+      {
+         mtf_info = tf_name + " (Sinkronisasi...)";
+         return;
+      }
       allow_buy  = t_htf.IsNaik;
       allow_sell = !t_htf.IsNaik;
       mtf_info   = StringFormat("%s Live(Bar 0): %s (neto %.0f%%)",
@@ -1000,9 +1036,14 @@ void EvaluateMTFCompass(bool &allow_buy, bool &allow_sell, string &mtf_info)
       return;
    }
 
-   if(InpMTFMode == MTF_CLOSED_BAR1)
+   if(InpCompassMTFMode == MTF_CLOSED_BAR1)
    {
       Tabranij t_htf = HitungTabranij(_Symbol, trend_tf, 1);
+      if(t_htf.Waktu == 0)
+      {
+         mtf_info = tf_name + " (Sinkronisasi...)";
+         return;
+      }
       allow_buy  = t_htf.IsNaik;
       allow_sell = !t_htf.IsNaik;
       mtf_info   = StringFormat("%s Closed(Bar 1): %s (neto %.0f%%)",
@@ -1013,11 +1054,16 @@ void EvaluateMTFCompass(bool &allow_buy, bool &allow_sell, string &mtf_info)
 
    Tabranij htf0 = HitungTabranij(_Symbol, trend_tf, 0);
    Tabranij htf1 = HitungTabranij(_Symbol, trend_tf, 1);
+   if(htf0.Waktu == 0 || htf1.Waktu == 0)
+   {
+      mtf_info = tf_name + " (Sinkronisasi...)";
+      return;
+   }
 
    double htf_high_T = 0.0, htf_low_R = 0.0;
    bool has_range = GetExtremeTR(_Symbol, trend_tf, 2, MathMax(1, InpHTFLookbackBars), htf_high_T, htf_low_R);
 
-   double min_rej = InpMinRejectionPct / 100.0;
+   double min_rej = InpMinRejectionRatio / 100.0;
 
    bool htf_rev_buy  = (htf1.RasioPenolakanBawah >= min_rej && htf1.EkorBawah > htf1.EkorAtas) ||
                        (has_range && htf1.R < htf_low_R && htf1.I > htf_low_R);
@@ -1073,31 +1119,37 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
    out_order_comment   = "";
    out_reason          = "Tidak Ada Sinyal";
 
+   if(t1.Waktu == 0)
+   {
+      out_reason = "Menunggu Data Bar Timeframe...";
+      return;
+   }
+
    if(InpMinNetoPoints > 0 && (t1.N / _Point) < InpMinNetoPoints)
    {
       out_reason = StringFormat("Neto Kecil (%.0f < %.0f pts)", t1.N / _Point, InpMinNetoPoints);
       return;
    }
 
-   double min_eff = InpMinEfficiencyPct / 100.0;
-   double min_rej = InpMinRejectionPct  / 100.0;
+   double min_eff = InpMinEfficiencyRatio / 100.0;
+   double min_rej = InpMinRejectionRatio  / 100.0;
 
    double neto_pct = t1.EfisiensiNeto       * 100.0;
    double eka_pct  = t1.RasioPenolakanAtas  * 100.0; // eka = Ekor Atas %
    double ekb_pct  = t1.RasioPenolakanBawah * 100.0; // ekb = Ekor Bawah %
 
    ENUM_TIMEFRAMES exec_tf = GetExecTF();
-   double prev_highest_T = t2.T;
-   double prev_lowest_R  = t2.R;
+   double prev_highest_T = (t2.T > 0.0) ? t2.T : t1.T;
+   double prev_lowest_R  = (t2.R > 0.0) ? t2.R : t1.R;
    GetExtremeTR(_Symbol, exec_tf, 2, MathMax(1, InpLookbackBars), prev_highest_T, prev_lowest_R);
 
-   // A. Sinyal Momentum Neto (Follow Trend)
+   // A. Sinyal Momentum Neto
    bool sig_momentum_buy  = (t1.IsNaik  && t1.EfisiensiNeto >= min_eff);
    bool sig_momentum_sell = (!t1.IsNaik && t1.EfisiensiNeto >= min_eff);
 
-   // B. Sinyal Ekor Atas (eka) & Ekor Bawah (ekb)
-   bool is_eka_dominant   = (t1.RasioPenolakanAtas  >= min_rej && t1.EkorAtas  > t1.EkorBawah);
-   bool is_ekb_dominant   = (t1.RasioPenolakanBawah >= min_rej && t1.EkorBawah > t1.EkorAtas);
+   // B. Sinyal Ekor Atas (eka) & Ekor Bawah (ekb) (Dominan atau >= Rasio Ekor)
+   bool is_eka_dominant   = (t1.EkorAtas  > t1.EkorBawah && (t1.RasioPenolakanAtas  >= min_rej || t1.EkorAtas  > t1.N));
+   bool is_ekb_dominant   = (t1.EkorBawah > t1.EkorAtas  && (t1.RasioPenolakanBawah >= min_rej || t1.EkorBawah > t1.N));
 
    bool sig_ekor_buy  = false;
    bool sig_ekor_sell = false;
@@ -1131,16 +1183,16 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
       }
    }
 
-   // C. Sinyal Breakout Tabranij
-   bool sig_breakout_buy  = (t1.IsNaik  && t1.I > prev_highest_T && t1.EfisiensiNeto >= min_eff);
-   bool sig_breakout_sell = (!t1.IsNaik && t1.I < prev_lowest_R  && t1.EfisiensiNeto >= min_eff);
+   // C. Sinyal Breakout Tabranij (Inti Tembus T/R Sebelumnya)
+   bool sig_breakout_buy  = (t1.IsNaik  && (t1.I > prev_highest_T || (t2.T > 0 && t1.I > t2.T)));
+   bool sig_breakout_sell = (!t1.IsNaik && (t1.I < prev_lowest_R  || (t2.R > 0 && t1.I < t2.R)));
 
-   // D. Sinyal Reversal Tabranij
+   // D. Sinyal Reversal Tabranij (Sweep T/R atau Engulfing Badan A/B)
    bool rev_sweep_buy     = (t1.R < prev_lowest_R  && t1.I > prev_lowest_R  && t1.RasioPenolakanBawah >= min_rej);
    bool rev_sweep_sell    = (t1.T > prev_highest_T && t1.I < prev_highest_T && t1.RasioPenolakanAtas  >= min_rej);
 
-   bool rev_engulf_buy    = (!t2.IsNaik && t1.IsNaik  && t1.I > t2.A && t1.N > t2.N);
-   bool rev_engulf_sell   = (t2.IsNaik  && !t1.IsNaik && t1.I < t2.B && t1.N > t2.N);
+   bool rev_engulf_buy    = (t2.Waktu > 0 && !t2.IsNaik && t1.IsNaik  && t1.I > t2.A && t1.N > t2.N);
+   bool rev_engulf_sell   = (t2.Waktu > 0 && t2.IsNaik  && !t1.IsNaik && t1.I < t2.B && t1.N > t2.N);
 
    bool sig_reversal_buy  = (rev_sweep_buy  || rev_engulf_buy);
    bool sig_reversal_sell = (rev_sweep_sell || rev_engulf_sell);
@@ -1148,20 +1200,18 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
    switch(InpEntryMode)
    {
       case MODE_FOLLOW_TREND:
-         out_buy  = sig_momentum_buy;
-         out_sell = sig_momentum_sell;
+         out_buy  = t1.IsNaik;
+         out_sell = !t1.IsNaik;
          if(out_buy)
          {
             out_order_comment = StringFormat("GT Buy neto %.0f%%", neto_pct);
             out_reason        = out_order_comment;
          }
-         else if(out_sell)
+         else
          {
             out_order_comment = StringFormat("GT Sell neto %.0f%%", neto_pct);
             out_reason        = out_order_comment;
          }
-         else
-            out_reason = StringFormat("Skip: neto %.0f%% < %.0f%%", neto_pct, InpMinEfficiencyPct);
          break;
 
       case MODE_COUNTER_TREND:
@@ -1193,7 +1243,7 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
             out_reason        = out_order_comment;
          }
          else
-            out_reason = StringFormat("Skip: eka %.0f%% | ekb %.0f%% < %.0f%%", eka_pct, ekb_pct, InpMinRejectionPct);
+            out_reason = StringFormat("Skip: eka %.0f%% | ekb %.0f%%", eka_pct, ekb_pct);
          break;
 
       case MODE_BREAKOUT:
@@ -1237,6 +1287,7 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
          break;
 
       case MODE_SMART_HYBRID:
+         // 1. Breakout T/R
          if(sig_breakout_buy)
          {
             out_buy             = true;
@@ -1251,6 +1302,7 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
             out_order_comment   = "GT Sell breakout";
             out_reason          = StringFormat("GT Sell breakout (neto %.0f%%)", neto_pct);
          }
+         // 2. Reversal Sweep / Engulfing
          else if(sig_reversal_buy)
          {
             out_buy             = true;
@@ -1265,6 +1317,7 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
             out_order_comment   = "GT Sell reversal";
             out_reason          = StringFormat("GT Sell reversal (%s)", (rev_sweep_sell ? "Sweep T" : "Engulf B"));
          }
+         // 3. Ekor Dominan (eka / ekb)
          else if(sig_ekor_buy)
          {
             out_buy           = true;
@@ -1277,21 +1330,18 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
             out_order_comment = ekor_sell_comment;
             out_reason        = out_order_comment;
          }
-         else if(sig_momentum_buy)
+         // 4. Neto Dominan (Selalu Aktif Tanpa Dead-Zone)
+         else if(t1.IsNaik)
          {
             out_buy           = true;
             out_order_comment = StringFormat("GT Buy neto %.0f%%", neto_pct);
             out_reason        = out_order_comment;
          }
-         else if(sig_momentum_sell)
+         else
          {
             out_sell          = true;
             out_order_comment = StringFormat("GT Sell neto %.0f%%", neto_pct);
             out_reason        = out_order_comment;
-         }
-         else
-         {
-            out_reason = StringFormat("Hold (neto %.0f%% | eka %.0f%% | ekb %.0f%%)", neto_pct, eka_pct, ekb_pct);
          }
          break;
    }
@@ -1630,7 +1680,7 @@ void ManageBasketProfitAndLoss(const Tabranij &t, BasketExposure &exp)
    double so_pct      = (balance > 0) ? (total_loss_at_so_money / balance * 100.0) : 0.0;
 
    string status_text = StringFormat(
-      "=== [GRAFIK TABRANIJ MONITOR v3.00 (ALL TIMEFRAMES)] ===\n" +
+      "=== [GRAFIK TABRANIJ MONITOR v3.10 (ALL TIMEFRAMES)] ===\n" +
       "Rangkaian Waktu: %s\n" +
       "Kotak Kedepan  : %s\n" +
       "Kompas MTF     : %s\n" +
@@ -1732,57 +1782,17 @@ void ManageBasketProfitAndLoss(const Tabranij &t, BasketExposure &exp)
 }
 
 //+------------------------------------------------------------------+
-//| Expert initialization function                                   |
+//| Fungsi Utama Siklus Evaluasi & Eksekusi (Dipanggil Tick & Timer) |
 //+------------------------------------------------------------------+
-int OnInit()
-{
-   InitTradeEngine();
-   last_exec_bar_time = 0;
-
-   // Aktifkan Chart Shift agar ada ruang di sebelah kanan candle Live untuk menggambar kotak masa depan (+1, +2, +3)
-   ChartSetInteger(0, CHART_SHOW_OBJECT_DESCR, true);
-   ChartSetInteger(0, CHART_SHIFT, true);
-   ChartSetDouble(0, CHART_SHIFT_SIZE, 25.0);
-
-   // Langsung hitung & gambar kotak proyeksi begitu EA dipasang atau saat ganti Timeframe (M1/M5/M15/M30/H1)
-   ENUM_TIMEFRAMES exec_tf = GetExecTF();
-   Tabranij t1 = HitungTabranij(_Symbol, exec_tf, 1);
-   Tabranij future_boxes[];
-   if(CalculateFutureProjections(future_boxes, g_timeline_info, g_future_boxes_info))
-   {
-      DrawFutureBoxesOnChart(future_boxes);
-   }
-   bool mtf_b = true, mtf_s = true;
-   EvaluateMTFCompass(mtf_b, mtf_s, g_mtf_status_info);
-   BasketExposure exp;
-   ManageBasketProfitAndLoss(t1, exp);
-
-   Print(">>> [Tabranij Scalper v3.00] Aktif pada ", _Symbol, " (", EnumToString(exec_tf),
-         ") | Riwayat: ", InpHistoryBarsToRead, " Bar -> Proyeksi Depan: +", InpFutureBarsToProject, " Bar");
-   return INIT_SUCCEEDED;
-}
-
-//+------------------------------------------------------------------+
-//| Expert deinitialization function                                 |
-//+------------------------------------------------------------------+
-void OnDeinit(const int reason)
-{
-   DeleteChartLines();
-   DeleteFutureBoxObjects();
-   Comment("");
-   Print(">>> [Tabranij Scalper] Dihentikan & objek chart dibersihkan.");
-}
-
-//+------------------------------------------------------------------+
-//| Expert tick function                                             |
-//+------------------------------------------------------------------+
-void OnTick()
+void RunTabranijCycle(bool allow_trade_execution)
 {
    ENUM_TIMEFRAMES exec_tf = GetExecTF();
 
-   // 1. Hitung Struktur Tabranij pada TF Aktif (Bar 1 dan Bar 2)
+   // 1. Hitung Struktur Tabranij pada TF Aktif (Bar 1 dan Bar 2, fallback ke Bar 0 jika Bar 1 belum siap)
    Tabranij t1 = HitungTabranij(_Symbol, exec_tf, 1);
    Tabranij t2 = HitungTabranij(_Symbol, exec_tf, 2);
+   if(t1.Waktu == 0)
+      t1 = HitungTabranij(_Symbol, exec_tf, 0);
 
    // 2. Hitung & Gambar Proyeksi Kotak Masa Depan (+1, +2, +3...) secara Real-Time di Semua Timeframe
    Tabranij future_boxes[];
@@ -1800,21 +1810,16 @@ void OnTick()
    BasketExposure exp;
    ManageBasketProfitAndLoss(t1, exp);
 
-   // 5. Cek Pergantian Bar pada Timeframe Aktif
-   datetime current_bar_time = iTime(_Symbol, exec_tf, 0);
-   if(current_bar_time == 0) return;
+   if(!allow_trade_execution) return;
 
+   // 5. Cek Waktu Bar Aktif pada Timeframe Chart
+   datetime current_bar_time = iTime(_Symbol, exec_tf, 0);
+   if(current_bar_time == 0 || t1.Waktu == 0) return;
+
+   // Jika bar ini SUDAH berhasil dieksekusi, tunggu pergantian bar berikutnya
    if(current_bar_time == last_exec_bar_time)
    {
-      return; // Masih di bar yang sama
-   }
-
-   last_exec_bar_time = current_bar_time;
-
-   // Bersihkan pending order lama setiap pergantian bar jika diaktifkan
-   if(InpRefreshPendingEachBar)
-   {
-      DeleteAllPendingOrders();
+      return;
    }
 
    // 6. Batasan Maksimal Posisi Terbuka
@@ -1837,13 +1842,11 @@ void OnTick()
    if(raw_buy && !mtf_allow_buy)
    {
       g_last_signal_info += " [DITAHAN KOMPAS MTF SELL]";
-      Print("[Tabranij] Sinyal [", order_comment, "] ditahan karena Kompas MTF sedang BEARISH.");
       return;
    }
    if(raw_sell && !mtf_allow_sell)
    {
       g_last_signal_info += " [DITAHAN KOMPAS MTF BUY]";
-      Print("[Tabranij] Sinyal [", order_comment, "] ditahan karena Kompas MTF sedang BULLISH.");
       return;
    }
 
@@ -1852,20 +1855,26 @@ void OnTick()
    if(raw_buy && !CheckLayerAndStepPermission(true, is_break_or_rev, exp, block_reason))
    {
       g_last_signal_info += " [" + block_reason + "]";
-      Print("[Tabranij] ", block_reason);
       return;
    }
    if(raw_sell && !CheckLayerAndStepPermission(false, is_break_or_rev, exp, block_reason))
    {
       g_last_signal_info += " [" + block_reason + "]";
-      Print("[Tabranij] ", block_reason);
       return;
+   }
+
+   // Bersihkan pending order lama tepat sebelum memasang siklus order bar baru
+   if(InpRefreshPendingEachBar)
+   {
+      DeleteAllPendingOrders();
    }
 
    bool do_market_order = (InpExecOrderType == EXEC_MARKET_ONLY ||
                            InpExecOrderType == EXEC_MARKET_AND_LIMIT ||
                            InpExecOrderType == EXEC_MARKET_AND_STOP ||
                            InpExecOrderType == EXEC_MARKET_LIMIT_STOP);
+
+   bool executed_any = false;
 
    // 10. Eksekusi Market Order & Pending Order Masa Depan (+1, +2, +3)
    if(raw_buy)
@@ -1875,12 +1884,14 @@ void OnTick()
       {
          if(SafeExecute(true, lot_to_open, order_comment))
          {
+            executed_any         = true;
             g_last_order_comment = order_comment;
             Print("[GT] BUY Eksekusi ", DoubleToString(lot_to_open, 2), " Lot | Comment: [", order_comment, "]");
             if(InpEnableSound && !MQLInfoInteger(MQL_TESTER)) PlaySound(InpSoundBuy);
          }
       }
-      PlaceFuturePendingOrders(true, lot_to_open, future_boxes);
+      int pend = PlaceFuturePendingOrders(true, lot_to_open, future_boxes);
+      if(pend > 0) executed_any = true;
    }
    else if(raw_sell)
    {
@@ -1889,12 +1900,76 @@ void OnTick()
       {
          if(SafeExecute(false, lot_to_open, order_comment))
          {
+            executed_any         = true;
             g_last_order_comment = order_comment;
             Print("[GT] SELL Eksekusi ", DoubleToString(lot_to_open, 2), " Lot | Comment: [", order_comment, "]");
             if(InpEnableSound && !MQLInfoInteger(MQL_TESTER)) PlaySound(InpSoundSell);
          }
       }
-      PlaceFuturePendingOrders(false, lot_to_open, future_boxes);
+      int pend = PlaceFuturePendingOrders(false, lot_to_open, future_boxes);
+      if(pend > 0) executed_any = true;
    }
+
+   // Kunci waktu bar HANYA setelah order benar-benar berhasil tereksekusi
+   if(executed_any)
+   {
+      last_exec_bar_time = current_bar_time;
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   InitTradeEngine();
+   last_exec_bar_time = 0;
+
+   // Bersihkan objek sisa dari timeframe sebelumnya agar koordinat ter-reset segar
+   DeleteFutureBoxObjects();
+
+   // Aktifkan Chart Shift agar ada ruang kosong di sebelah kanan candle Live untuk kotak (+1, +2, +3)
+   ChartSetInteger(0, CHART_SHOW_OBJECT_DESCR, true);
+   ChartSetInteger(0, CHART_SHIFT, true);
+   ChartSetDouble(0, CHART_SHIFT_SIZE, 28.0);
+
+   // Aktifkan Timer 1 Detik agar kotak bayangan & dashboard langsung muncul meski ganti TF / tick lambat
+   EventSetTimer(1);
+
+   // Jalankan siklus visualisasi pertama kali saat inisialisasi
+   RunTabranijCycle(false);
+
+   ENUM_TIMEFRAMES exec_tf = GetExecTF();
+   Print(">>> [Tabranij Scalper v3.10] Aktif pada ", _Symbol, " (", EnumToString(exec_tf),
+         ") | Riwayat: ", InpHistoryBarsToRead, " Bar -> Proyeksi Depan: +", InpFutureBarsToProject, " Bar");
+   return INIT_SUCCEEDED;
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   EventKillTimer();
+   DeleteChartLines();
+   DeleteFutureBoxObjects();
+   Comment("");
+   Print(">>> [Tabranij Scalper] Dihentikan & objek chart dibersihkan.");
+}
+
+//+------------------------------------------------------------------+
+//| Expert timer function (Update Tiap 1 Detik di Semua Timeframe)   |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   RunTabranijCycle(true);
+}
+
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   RunTabranijCycle(true);
 }
 //+------------------------------------------------------------------+
