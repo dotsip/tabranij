@@ -7,30 +7,29 @@
 
 ---
 
-## 1. Filosofi & Anatomi Grafik Tabranij (`T-A-B-R-A-N-I-J`)
+## 1. Filosofi & Anatomi Grafik Tabranij (`T-A-B-R-A-I-N-J`)
 
-Berbeda dengan bot standar yang hanya mengenal istilah `Open, High, Low, Close`, bot ini membaca setiap kotak waktu (*candlestick*) melalui **Anatomi Grafik Tabranij** yang membedah kekuatan dorongan badan dan tolakan ekor secara matematis:
+Berbeda dengan bot standar yang hanya mengenal istilah `Open, High, Low, Close`, bot ini membaca setiap kotak waktu (*candlestick*) melalui **Anatomi Murni Grafik Tabranij** yang membedah kekuatan dorongan badan (*Neto*) dan tolakan ekor (*Atas* & *Bawah*) secara matematis dan tanpa ambiguitas:
 
 | Simbol | Nama Variabel | Rumus / Definisi | Makna Anatomi |
 | :--- | :--- | :--- | :--- |
 | **T** | `T` (Tinggi) | `High` | Titik harga tertinggi yang dicapai pada kotak waktu |
-| **A** | `A` (Atas) | `max(Awal, Inti)` | Batas atap badan (*body*) kotak |
-| **B** | `B` (Bawah) | `min(Awal, Inti)` | Batas lantai badan (*body*) kotak |
+| **A** | `A` (Atas) | `T - max(Awal, Inti)` | Panjang jarum/ekor atas (penolakan atas) |
+| **B** | `B` (Bawah) | `min(Awal, Inti) - R` | Panjang jarum/ekor bawah (penolakan bawah) |
 | **R** | `R` (Rendah) | `Low` | Titik harga terendah yang dicapai pada kotak waktu |
-| **Awal** | `Awal` | `Open` | Harga pembukaan saat kotak waktu dimulai |
+| **A** | `A` (Awal) | `Open` | Harga pembukaan saat kotak waktu dimulai |
 | **I** | `I` (Inti) | `Close` / `Live Price` | Harga penutupan (atau harga berjalan saat ini pada Bar `0`) |
-| **N** | `N` (Neto) | `|I - Awal|` | Panjang murni badan kotak (perpindahan bersih harga) |
+| **N** | `N` (Neto) | `|Inti - Awal|` | Panjang murni badan kotak (perpindahan bersih harga) |
 | **J** | `J` (Julat) | `T - R` | Rentang total pergerakan kotak waktu |
-| **eka** | `EkorAtas` | `T - A` | Panjang jarum/ekor atas |
-| **ekb** | `EkorBawah` | `B - R` | Panjang jarum/ekor bawah |
 
 ### 3 Rasio Utama Tabranij:
-1. **Efisiensi Neto (`neto %`):** `(N / J) * 100%` — Mengukur seberapa utuh tenaga dorongan badan dibanding total rentang gerak.
-2. **Rasio Ekor Atas (`eka %`):** `(EkorAtas / J) * 100%` — Mengukur persentase panjang ekor atas pada kotak.
-3. **Rasio Ekor Bawah (`ekb %`):** `(EkorBawah / J) * 100%` — Mengukur persentase panjang ekor bawah pada kotak.
+1. **Rasio Atas (`A %`):** `(A / J) * 100%` — Mengukur persentase panjang ekor atas (*upper rejection*) pada kotak.
+2. **Efisiensi Neto (`N %`):** `(N / J) * 100%` — Mengukur seberapa utuh tenaga dorongan badan dibanding total rentang gerak.
+3. **Rasio Bawah (`B %`):** `(B / J) * 100%` — Mengukur persentase panjang ekor bawah (*lower rejection*) pada kotak.
 
 > **Hukum Keseimbangan Anatomi Tabranij:**  
-> `neto % + eka % + ekb % = 100%`
+> `A % + N % + B % = 100%`  
+> *(Atas + Neto + Bawah = Julat / J)*
 
 ---
 
@@ -42,22 +41,22 @@ Berbeda dengan bot standar yang hanya mengenal istilah `Open, High, Low, Close`,
    - Mengidentifikasi batas tertinggi ($T_{120}$) dan terendah ($R_{120}$) 2 jam sebagai dinding support & resistance alamiah tanpa membebani memori CPU/VPS.
 2. **Mesin Pemicu Mikro 10 Detik (Ultra-High Frequency / 6x Entry per Menit):**
    - Lilin M1 (60 detik) dibagi menjadi **6 jendela mikro 10 detik**:
-     - Detik `00–09` $\to$ Eksekusi pada detik **10**
-     - Detik `10–19` $\to$ Eksekusi pada detik **20**
-     - Detik `20–29` $\to$ Eksekusi pada detik **30**
-     - Detik `30–39` $\to$ Eksekusi pada detik **40**
-     - Detik `40–49` $\to$ Eksekusi pada detik **50**
-     - Detik `50–59` $\to$ Eksekusi pada detik **00**
+     - Detik `00–09` $->$ Eksekusi pada detik **10**
+     - Detik `10–19` $->$ Eksekusi pada detik **20**
+     - Detik `20–29` $->$ Eksekusi pada detik **30**
+     - Detik `30–39` $->$ Eksekusi pada detik **40**
+     - Detik `40–49` $->$ Eksekusi pada detik **50**
+     - Detik `50–59` $->$ Eksekusi pada detik **00**
    - Menghitung aliran order real-time (`UpTicks` vs `DownTicks`) selama 10 detik berjalan.
 3. **Sistem Tingkat Lot Dinamis (Opsi 1, Opsi 2, Opsi 3):**
    - **Tingkat 1 (Reguler - Lot Standar):** Di dalam range 6 kotak M1:
-     - **Opsi 1 (Follow Tren M1):** Searah dengan warna candle GT M1 sebelumnya (Hijau + `UpTicks > DownTicks` $\to$ **BUY**; Merah + `DownTicks > UpTicks` $\to$ **SELL**).
-     - **Opsi 2 (Pantulan Ekor M1):** Menangkap pembalikan arah saat harga menguji atap/lantai ekor dominan M1 sebelumnya ($eka_1 / ekb_1$).
+     - **Opsi 1 (Follow Tren M1):** Searah dengan warna candle GT M1 sebelumnya (Hijau + `UpTicks > DownTicks` $->$ **BUY**; Merah + `DownTicks > UpTicks` $->$ **SELL**).
+     - **Opsi 2 (Pantulan Ekor M1):** Menangkap pembalikan arah saat harga menguji atap/lantai penolakan M1 sebelumnya ($A_1 / B_1$).
    - **Tingkat 2 (Super Booster - Lot Dinaikkan / Pengali):**
      - **Opsi 3 (Melampaui 6 Kotak M1 Sebelumnya):** Mengacu pada titik tertinggi ($T_6$) dan terendah ($R_6$) dari 6 menit terakhir:
-       - **Breakout 6 Kotak:** Menembus ke atas $T_6$ + `UpTicks` $\to$ **BUY BOOSTER** (Lot dikalikan `InpBoosterLotMultiplier`).
-       - **Breakout 6 Kotak:** Menembus ke bawah $R_6$ + `DownTicks` $\to$ **SELL BOOSTER** (Lot dikalikan `InpBoosterLotMultiplier`).
-       - **Reversal Sweep 6 Kotak:** Menusuk keluar $T_6/R_6$ lalu ditarik mundur + tick berbalik $\to$ **BOOSTER REVERSAL** dengan lot ditingkatkan untuk mempercepat panen keranjang.
+       - **Breakout 6 Kotak:** Menembus ke atas $T_6$ + `UpTicks` $->$ **BUY BOOSTER** (Lot dikalikan `InpBoosterLotMultiplier`).
+       - **Breakout 6 Kotak:** Menembus ke bawah $R_6$ + `DownTicks` $->$ **SELL BOOSTER** (Lot dikalikan `InpBoosterLotMultiplier`).
+       - **Reversal Sweep 6 Kotak:** Menusuk keluar $T_6/R_6$ lalu ditarik mundur + tick berbalik $->$ **BOOSTER REVERSAL** dengan lot ditingkatkan untuk mempercepat panen keranjang.
 
 ---
 
@@ -66,7 +65,7 @@ Setiap order yang dieksekusi oleh bot memiliki **komentar alasan spesifik (`Orde
 
 1. **`MODE_FOLLOW_TREND`:** Mengikuti arah `Neto` candle (`Hijau = BUY`, `Merah = SELL`).
 2. **`MODE_COUNTER_TREND`:** Melawan arah `Neto` candle untuk menangkap pantulan.
-3. **`MODE_REJECTION_EKOR`:** Membaca dominasi `eka` (Ekor Atas) dan `ekb` (Ekor Bawah).
+3. **`MODE_REJECTION_EKOR`:** Membaca dominasi `A` (Atas) dan `B` (Bawah).
 4. **`MODE_BREAKOUT`:** Mendeteksi saat `Inti (I)` menembus atap `Tinggi (T)` atau lantai `Rendah (R)`.
 5. **`MODE_REVERSAL`:** Mendeteksi *Liquidity Sweep* atau *Engulfing Neto*.
 6. **`MODE_SMART_HYBRID` (Default):** Menggabungkan keempat logika di atas secara berurutan (*Zero Dead-Zone*).
@@ -75,7 +74,7 @@ Setiap order yang dieksekusi oleh bot memiliki **komentar alasan spesifik (`Orde
 
 ### C. Proyeksi Kotak Masa Depan (`+1, +2, +3`) & Pending Order (`Limit` / `Stop`)
 Bot memproyeksikan kotak yang **akan terjadi ke depan** (`InpFutureBarsToProject`, default `3` kotak: `+1, +2, +3`) di **semua Timeframe (`M1, M5, M15, M30, H1, H4, D1`)**:
-1. Menghitung rata-rata terbobot (*Linear Weighted Average*) dari `VektorNeto`, `N`, `J`, `EkorAtas`, dan `EkorBawah` dengan faktor redaman $0.92^k$.
+1. Menghitung rata-rata terbobot (*Linear Weighted Average*) dari `VektorNeto`, `N`, `J`, `A (Atas)`, dan `B (Bawah)` dengan faktor redaman $0.92^k$.
 2. Menggambar visual kotak bayangan masa depan di sebelah kanan candle berjalan.
 3. Memasang pending order `Limit` dan `Stop` di proyeksi level $T$ dan $R$.
 
@@ -109,9 +108,9 @@ Bot memproyeksikan kotak yang **akan terjadi ke depan** (`InpFutureBarsToProject
 ```text
 Grafik_Tabranij_Scalper_XAUUSD.mq5
 ├── Struktur Data & Helper Dasar
-│   ├── struct Tabranij                   -> Struktur anatomi T-A-B-R-A-N-I-J
+│   ├── struct Tabranij                   -> Struktur anatomi T-A-B-R-A-I-N-J
 │   ├── struct BasketExposure             -> Statistik posisi BUY, SELL, Net Lot, & Profit
-│   ├── HitungTabranij()                  -> Kalkulasi anatomi candle pada TF & shift tertentu
+│   ├── HitungTabranij()                  -> Kalkulasi anatomi candle (A=Atas, B=Bawah, N=Neto)
 │   ├── GetExtremeTR()                    -> Mencari Tinggi (T) & Rendah (R) ekstrem N bar ke belakang
 │   ├── GetExecTF()                       -> Menentukan Timeframe aktif (otomatis ikuti _Period)
 │   └── GetEffectiveTrendTF()             -> Menentukan Timeframe Kompas MTF secara dinamis
@@ -128,7 +127,7 @@ Grafik_Tabranij_Scalper_XAUUSD.mq5
 │
 ├── Modul Sinyal & Filter (Pilar 1 & Pilar 2)
 │   ├── EvaluateMTFCompass()              -> Evaluasi filter tren Timeframe Besar
-│   ├── EvaluateTabranijSignal()          -> Otak sinyal 6 mode bar-by-bar
+│   ├── EvaluateTabranijSignal()          -> Otak sinyal 6 mode bar-by-bar (A/B dominant, Neto)
 │   ├── CheckLayerAndStepPermission()     -> Validasi arah keranjang & jarak minimal antar order
 │   └── CalculateNextLot()                -> Kalkulasi lot (+ Booster Lot Opsi 3 & Auto-Overtake)
 │
@@ -156,4 +155,4 @@ Grafik_Tabranij_Scalper_XAUUSD.mq5
 2. Buka file `Grafik_Tabranij_Scalper_XAUUSD.mq5` di dalam folder `MQL5/Experts/`.
 3. Tekan **`F7` (Compile)** — pastikan `0 errors, 0 warnings`.
 4. Pada jendela MT5, pastikan tombol **`Algo Trading`** di toolbar atas berwarna **Hijau**.
-5. Pasang EA ke chart **XAUUSD M1** — bot akan otomatis menghitung riwayat 120 kotak dan mengevaluasi pemicu mikro 10 detik dengan informasi *UpTicks vs DownTicks* langsung di dashboard chart.
+5. Pasang EA ke chart **XAUUSD M1** — bot akan otomatis membaca riwayat 120 kotak dan mengevaluasi pemicu mikro 10 detik dengan informasi *UpTicks vs DownTicks* langsung di dashboard chart.

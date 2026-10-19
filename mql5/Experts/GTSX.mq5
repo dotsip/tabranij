@@ -15,22 +15,24 @@
 //+------------------------------------------------------------------+
 struct Tabranij
 {
-   datetime Waktu;  // Waktu Bar (Historis, Live, atau Masa Depan)
-   double   T;      // Tinggi (High)
-   double   A;      // Atas = max(Awal, Inti)
-   double   B;      // Bawah = min(Awal, Inti)
-   double   R;      // Rendah (Low)
-   double   Awal;   // Awal (Open)
-   double   I;      // Inti (Close / Live Price)
-   double   N;      // Neto = |Inti - Awal|
-   double   J;      // Julat = Tinggi - Rendah
-   double   EkorAtas;   // T - A
-   double   EkorBawah;  // B - R
+   datetime Waktu;        // Waktu Bar (Historis, Live, atau Masa Depan)
+   double   T;            // Tinggi (High)
+   double   A;            // Atas = T - max(Awal, Inti) (Panjang Jarum/Penolakan Atas)
+   double   B;            // Bawah = min(Awal, Inti) - R (Panjang Jarum/Penolakan Bawah)
+   double   R;            // Rendah (Low)
+   double   Awal;         // Awal (Open)
+   double   N;            // Neto = |Inti - Awal| (Panjang Bersih Badan)
+   double   I;            // Inti (Close / Live Price)
+   double   J;            // Julat = Tinggi - Rendah (A + N + B)
+   double   AtapBadan;    // max(Awal, Inti) -> Koordinat harga atap badan
+   double   LantaiBadan;  // min(Awal, Inti) -> Koordinat harga lantai badan
+   double   EkorAtas;     // Alias untuk A
+   double   EkorBawah;    // Alias untuk B
    bool     IsNaik;
    double   VektorNeto;
-   double   EfisiensiNeto;
-   double   RasioPenolakanAtas;
-   double   RasioPenolakanBawah;
+   double   EfisiensiNeto;       // N / J (Neto %)
+   double   RasioPenolakanAtas;  // A / J (Rasio Atas %)
+   double   RasioPenolakanBawah; // B / J (Rasio Bawah %)
 };
 
 //+------------------------------------------------------------------+
@@ -71,21 +73,24 @@ Tabranij HitungTabranij(string symbol, ENUM_TIMEFRAMES timeframe, int shift)
    tab.Awal  = rates[0].open;
    tab.I     = rates[0].close;
 
-   tab.A = MathMax(tab.Awal, tab.I);
-   tab.B = MathMin(tab.Awal, tab.I);
-   tab.N = MathAbs(tab.I - tab.Awal);
-   tab.J = tab.T - tab.R;
+   tab.AtapBadan   = MathMax(tab.Awal, tab.I);
+   tab.LantaiBadan = MathMin(tab.Awal, tab.I);
+   tab.A           = tab.T - tab.AtapBadan;   // A (Atas) = Penolakan Atas
+   tab.B           = tab.LantaiBadan - tab.R; // B (Bawah) = Penolakan Bawah
+   tab.EkorAtas    = tab.A;
+   tab.EkorBawah   = tab.B;
 
-   tab.EkorAtas   = tab.T - tab.A;
-   tab.EkorBawah  = tab.B - tab.R;
+   tab.N = MathAbs(tab.I - tab.Awal);
+   tab.J = tab.T - tab.R; // A + N + B == J
+
    tab.VektorNeto = tab.I - tab.Awal;
    tab.IsNaik     = (tab.I >= tab.Awal);
 
    if(tab.J > 0)
    {
       tab.EfisiensiNeto       = tab.N / tab.J;
-      tab.RasioPenolakanAtas  = tab.EkorAtas / tab.J;
-      tab.RasioPenolakanBawah = tab.EkorBawah / tab.J;
+      tab.RasioPenolakanAtas  = tab.A / tab.J;
+      tab.RasioPenolakanBawah = tab.B / tab.J;
    }
    return tab;
 }
@@ -133,8 +138,10 @@ enum ENUM_ENTRY_MODE
 // 2. Pilihan Logika Arah Ekor Atas (eka) & Ekor Bawah (ekb)
 enum ENUM_EKOR_DIRECTION
 {
-   EKOR_EKA_BUY_EKB_SELL, // Ekor Atas (eka) = BUY, Ekor Bawah (ekb) = SELL (Kejar Ekor)
-   EKOR_EKB_BUY_EKA_SELL  // Ekor Bawah (ekb) = BUY, Ekor Atas (eka) = SELL (Pantulan Pinbar)
+   EKOR_A_BUY_B_SELL,     // Atas (A) = BUY, Bawah (B) = SELL (Kejar Penolakan)
+   EKOR_B_BUY_A_SELL,     // Bawah (B) = BUY, Atas (A) = SELL (Pantulan Penolakan)
+   EKOR_EKA_BUY_EKB_SELL = EKOR_A_BUY_B_SELL, // Alias kompatibilitas
+   EKOR_EKB_BUY_EKA_SELL = EKOR_B_BUY_A_SELL  // Alias kompatibilitas
 };
 
 // 3. Pilihan Mode Eksekusi Order (Market + Pending Limit & Stop Masa Depan)
@@ -437,15 +444,17 @@ bool CalculateFutureProjections(Tabranij &future_boxes[], string &out_timeline_s
       double step_v = live_step_vektor * damp;
 
       fp.I = NormalizeDouble(fp.Awal + step_v, _Digits);
-      fp.A = MathMax(fp.Awal, fp.I);
-      fp.B = MathMin(fp.Awal, fp.I);
-      fp.N = MathAbs(fp.I - fp.Awal);
+      fp.AtapBadan   = MathMax(fp.Awal, fp.I);
+      fp.LantaiBadan = MathMin(fp.Awal, fp.I);
+      fp.N           = MathAbs(fp.I - fp.Awal);
 
-      fp.EkorAtas  = NormalizeDouble(avg_eka, _Digits);
-      fp.EkorBawah = NormalizeDouble(avg_ekb, _Digits);
+      fp.A           = NormalizeDouble(avg_eka, _Digits); // Atas
+      fp.B           = NormalizeDouble(avg_ekb, _Digits); // Bawah
+      fp.EkorAtas    = fp.A;
+      fp.EkorBawah   = fp.B;
 
-      fp.T = NormalizeDouble(fp.A + fp.EkorAtas,  _Digits);
-      fp.R = NormalizeDouble(fp.B - fp.EkorBawah, _Digits);
+      fp.T = NormalizeDouble(fp.AtapBadan + fp.A,   _Digits);
+      fp.R = NormalizeDouble(fp.LantaiBadan - fp.B, _Digits);
       fp.J = fp.T - fp.R;
 
       fp.VektorNeto = fp.I - fp.Awal;
@@ -542,13 +551,13 @@ void DrawFutureBoxesOnChart(const Tabranij &future_boxes[])
       // 2. Kotak Dalam Badan Neto (Atas A ke Bawah B) - Blok Berwarna
       if(ObjectFind(0, body_name) < 0)
       {
-         ObjectCreate(0, body_name, OBJ_RECTANGLE, 0, t_start, fp.A, t_end, fp.B);
+         ObjectCreate(0, body_name, OBJ_RECTANGLE, 0, t_start, fp.AtapBadan, t_end, fp.LantaiBadan);
          ObjectSetInteger(0, body_name, OBJPROP_FILL, true);
          ObjectSetInteger(0, body_name, OBJPROP_BACK, true);
          ObjectSetInteger(0, body_name, OBJPROP_SELECTABLE, false);
       }
-      ObjectMove(0, body_name, 0, t_start, fp.A);
-      ObjectMove(0, body_name, 1, t_end,   fp.B);
+      ObjectMove(0, body_name, 0, t_start, fp.AtapBadan);
+      ObjectMove(0, body_name, 1, t_end,   fp.LantaiBadan);
       ObjectSetInteger(0, body_name, OBJPROP_COLOR, box_color);
       ObjectSetInteger(0, body_name, OBJPROP_STYLE, STYLE_SOLID);
       ObjectSetInteger(0, body_name, OBJPROP_WIDTH, 2);
@@ -1181,12 +1190,12 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
       if(is_eka_dominant)
       {
          sig_ekor_buy     = true;
-         ekor_buy_comment = StringFormat("GT Buy eka %.0f%%", eka_pct);
+         ekor_buy_comment = StringFormat("GT Buy A %.0f%%", eka_pct);
       }
       if(is_ekb_dominant)
       {
          sig_ekor_sell     = true;
-         ekor_sell_comment = StringFormat("GT Sell ekb %.0f%%", ekb_pct);
+         ekor_sell_comment = StringFormat("GT Sell B %.0f%%", ekb_pct);
       }
    }
    else
@@ -1194,12 +1203,12 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
       if(is_ekb_dominant)
       {
          sig_ekor_buy     = true;
-         ekor_buy_comment = StringFormat("GT Buy ekb %.0f%%", ekb_pct);
+         ekor_buy_comment = StringFormat("GT Buy B %.0f%%", ekb_pct);
       }
       if(is_eka_dominant)
       {
          sig_ekor_sell     = true;
-         ekor_sell_comment = StringFormat("GT Sell eka %.0f%%", eka_pct);
+         ekor_sell_comment = StringFormat("GT Sell A %.0f%%", eka_pct);
       }
    }
 
@@ -1211,8 +1220,8 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
    bool rev_sweep_buy     = (t1.R < prev_lowest_R  && t1.I > prev_lowest_R  && t1.RasioPenolakanBawah >= min_rej);
    bool rev_sweep_sell    = (t1.T > prev_highest_T && t1.I < prev_highest_T && t1.RasioPenolakanAtas  >= min_rej);
 
-   bool rev_engulf_buy    = (t2.Waktu > 0 && !t2.IsNaik && t1.IsNaik  && t1.I > t2.A && t1.N > t2.N);
-   bool rev_engulf_sell   = (t2.Waktu > 0 && t2.IsNaik  && !t1.IsNaik && t1.I < t2.B && t1.N > t2.N);
+   bool rev_engulf_buy    = (t2.Waktu > 0 && !t2.IsNaik && t1.IsNaik  && t1.I > t2.AtapBadan   && t1.N > t2.N);
+   bool rev_engulf_sell   = (t2.Waktu > 0 && t2.IsNaik  && !t1.IsNaik && t1.I < t2.LantaiBadan && t1.N > t2.N);
 
    bool sig_reversal_buy  = (rev_sweep_buy  || rev_engulf_buy);
    bool sig_reversal_sell = (rev_sweep_sell || rev_engulf_sell);
@@ -1263,7 +1272,7 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
             out_reason        = out_order_comment;
          }
          else
-            out_reason = StringFormat("Skip: eka %.0f%% | ekb %.0f%%", eka_pct, ekb_pct);
+            out_reason = StringFormat("Skip: A %.0f%% | B %.0f%%", eka_pct, ekb_pct);
          break;
 
       case MODE_BREAKOUT:
@@ -1292,14 +1301,14 @@ void EvaluateTabranijSignal(const Tabranij &t1, const Tabranij &t2,
          {
             out_order_comment = "GT Buy reversal";
             out_reason        = rev_sweep_buy
-                                ? StringFormat("GT Buy reversal (Sweep R | ekb %.0f%%)", ekb_pct)
+                                ? StringFormat("GT Buy reversal (Sweep R | B %.0f%%)", ekb_pct)
                                 : StringFormat("GT Buy reversal (Engulf A | neto %.0f%%)", neto_pct);
          }
          else if(out_sell)
          {
             out_order_comment = "GT Sell reversal";
             out_reason        = rev_sweep_sell
-                                ? StringFormat("GT Sell reversal (Sweep T | eka %.0f%%)", eka_pct)
+                                ? StringFormat("GT Sell reversal (Sweep T | A %.0f%%)", eka_pct)
                                 : StringFormat("GT Sell reversal (Engulf B | neto %.0f%%)", neto_pct);
          }
          else
@@ -1708,8 +1717,8 @@ void ManageBasketProfitAndLoss(const Tabranij &t, BasketExposure &exp)
       "Kompas MTF     : %s\n" +
       "Sinyal & Entri : %s | Last: [%s]\n" +
       "--------------------------------------\n" +
-      "Tinggi (T): %.2f | Rendah (R): %.2f | Neto (N): %.2f | Julat (J): %.2f\n" +
-      "neto: %.0f%% | eka (Ekor Atas): %.0f%% | ekb (Ekor Bawah): %.0f%%\n" +
+      "T (Tinggi): %.2f | R (Rendah): %.2f | N (Neto): %.2f | J (Julat): %.2f\n" +
+      "Atas (A): %.0f%% | Neto (N): %.0f%% | Bawah (B): %.0f%% (A+N+B=100%%)\n" +
       "--------------------------------------\n" +
       "EXPOSURE BUY   : %d Pos | %.2f Lot | P/L: $%.2f | Garis: %s\n" +
       "EXPOSURE SELL  : %d Pos | %.2f Lot | P/L: $%.2f | Garis: %s\n" +
@@ -1913,30 +1922,30 @@ bool Check10SecMicroTrigger(bool &out_buy, bool &out_sell, bool &out_is_booster,
    // TINGKAT 1: REGULER (DI DALAM RANGE 6 KOTAK M1 - LOT STANDAR)
    // =================================================================
 
-   // OPSI 2: PANTULAN EKOR DOMINAN M1 (REJECTION ATAP / LANTAI)
+   // OPSI 2: PANTULAN EKOR DOMINAN M1 (REJECTION ATAS A / BAWAH B)
    if(InpEnableRejectionM1)
    {
-      // Pantulan Lantai Ekor Bawah (ekb)
-      if(t1.EkorBawah > t1.EkorAtas && (t1.RasioPenolakanBawah >= 0.35 || t1.EkorBawah > t1.N))
+      // Pantulan Lantai Bawah (B)
+      if(t1.B > t1.A && (t1.RasioPenolakanBawah >= 0.35 || t1.B > t1.N))
       {
-         if(current_bid <= (t1.B + (t1.J * 0.25)) && up_ticks > down_ticks)
+         if(current_bid <= (t1.LantaiBadan + (t1.J * 0.25)) && up_ticks > down_ticks)
          {
             out_buy           = true;
             out_is_booster    = false;
-            out_order_comment = StringFormat("GT Buy 10s Rejection ekb (Up %d vs Dn %d)", up_ticks, down_ticks);
-            out_signal_info   = StringFormat("REGULER: Pantulan Ekor Bawah M1 (Up %d vs Dn %d)", up_ticks, down_ticks);
+            out_order_comment = StringFormat("GT Buy 10s Rejection B (Up %d vs Dn %d)", up_ticks, down_ticks);
+            out_signal_info   = StringFormat("REGULER: Pantulan Bawah (B) M1 (Up %d vs Dn %d)", up_ticks, down_ticks);
             return true;
          }
       }
-      // Pantulan Atap Ekor Atas (eka)
-      if(t1.EkorAtas > t1.EkorBawah && (t1.RasioPenolakanAtas >= 0.35 || t1.EkorAtas > t1.N))
+      // Pantulan Atap Atas (A)
+      if(t1.A > t1.B && (t1.RasioPenolakanAtas >= 0.35 || t1.A > t1.N))
       {
-         if(current_bid >= (t1.A - (t1.J * 0.25)) && down_ticks > up_ticks)
+         if(current_bid >= (t1.AtapBadan - (t1.J * 0.25)) && down_ticks > up_ticks)
          {
             out_sell          = true;
             out_is_booster    = false;
-            out_order_comment = StringFormat("GT Sell 10s Rejection eka (Dn %d vs Up %d)", down_ticks, up_ticks);
-            out_signal_info   = StringFormat("REGULER: Pantulan Ekor Atas M1 (Dn %d vs Up %d)", down_ticks, up_ticks);
+            out_order_comment = StringFormat("GT Sell 10s Rejection A (Dn %d vs Up %d)", down_ticks, up_ticks);
+            out_signal_info   = StringFormat("REGULER: Pantulan Atas (A) M1 (Dn %d vs Up %d)", down_ticks, up_ticks);
             return true;
          }
       }
