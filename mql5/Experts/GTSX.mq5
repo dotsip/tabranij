@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Surgas & Master MQL5 Gold Specialist"
 #property link      "https://github.com/surgas/tabranij"
-#property version   "3.10"
+#property version   "3.20"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -217,7 +217,7 @@ input ulong                 InpMagicNumber           = 999111;                  
 input group "=== [2. PROYEKSI KOTAK MASA DEPAN & PENDING ORDER (+1, +2, +3)] ==="
 input bool                  InpAutoFollowChartTF     = true;                    // Otomatis Ikuti Timeframe Chart (M1/M5/M15/M30/H1)?
 input ENUM_EXEC_ORDER_TYPE  InpExecOrderType         = EXEC_MARKET_LIMIT_STOP;  // Mode Eksekusi (Market + Pending Limit/Stop)
-input int                   InpHistoryBarsToRead     = 4;                       // Jumlah Kotak Historis ke Belakang (misal 4 kotak)
+input int                   InpHistoryBarsToRead     = 120;                     // Jumlah Kotak Historis ke Belakang (Default 120 Bar = 2 Jam M1)                       // Jumlah Kotak Historis ke Belakang (misal 4 kotak)
 input int                   InpFutureBarsToProject   = 3;                       // Jumlah Kotak Masa Depan Diproyeksikan (misal 3 kotak)
 input bool                  InpDrawFutureBoxes       = true;                    // Gambar Kotak Proyeksi Masa Depan di Kanan Chart?
 input bool                  InpRefreshPendingEachBar = true;                    // Perbarui Pending Order Otomatis Tiap Pergantian Bar?
@@ -283,12 +283,26 @@ input string                InpSoundSell             = "expert.wav";            
 input string                InpSoundTP               = "alert.wav";             // Suara Saat Profit Tercapai
 input string                InpSoundSL               = "stops.wav";             // Suara Saat Batas Rugi Terkena
 
+input group "=== [10. MIKRO-SIKLUS 10 DETIK & TINGKAT LOT (OPSI 1, 2, 3)] ==="
+input bool                  InpEnable10SecCycle      = true;                    // Aktifkan Pemicu Mikro 10 Detik? (Eksekusi Detik 10,20,30,40,50,00)
+input int                   InpLookback6Boxes        = 6;                       // Acuan Kotak M1 utk Breakout/Sweep (Opsi 3)
+input double                InpBoosterLotMultiplier  = 2.0;                     // Pengali Lot Booster Melampaui 6 Kotak (Opsi 3)
+input bool                  InpEnableFollowM1        = true;                    // Opsi 1: Follow Tren M1 (Searah Lilin Hijau/Merah)
+input bool                  InpEnableRejectionM1     = true;                    // Opsi 2: Pantulan Ekor M1 (Rejection Atap/Lantai)
+
 datetime last_exec_bar_time   = 0;
 string   g_last_signal_info   = "Siap Mengeksekusi Sinyal...";
 string   g_last_order_comment = "-";
 string   g_mtf_status_info    = "MTF OFF (Bebas 2 Arah)";
 string   g_timeline_info      = "Memuat Riwayat Timeframe...";
 string   g_future_boxes_info  = "Menghitung Kotak Proyeksi...";
+double   g_last_tick_bid          = 0.0;
+int      g_window_up_ticks        = 0;
+int      g_window_down_ticks      = 0;
+int      g_last_eval_up_ticks     = 0;
+int      g_last_eval_down_ticks   = 0;
+long     g_last_10s_window_key    = -1;
+string   g_micro_cycle_info       = "10s Mikro: Standby Menghitung Tick...";
 
 //+------------------------------------------------------------------+
 //| Dapatkan Timeframe Eksekusi Aktif (Selalu Ikuti Chart _Period)   |
@@ -622,7 +636,7 @@ double NormalizeLot(double raw_lot)
 //+------------------------------------------------------------------+
 //| Hitung Ukuran Lot Berikutnya Berdasarkan Layer, Exposure & Sinyal|
 //+------------------------------------------------------------------+
-double CalculateNextLot(bool is_buy, bool is_breakout_or_reversal, const BasketExposure &exp)
+double CalculateNextLot(bool is_buy, bool is_breakout_or_reversal, const BasketExposure &exp, bool is_booster_tier = false)
 {
    int same_side_count = is_buy ? exp.buy_count : exp.sell_count;
    double raw_lot = InpLotSize;
@@ -633,6 +647,12 @@ double CalculateNextLot(bool is_buy, bool is_breakout_or_reversal, const BasketE
          raw_lot = InpLotSize + (same_side_count * InpLotAddValue);
       else if(InpLotMode == LOT_MULTIPLIER)
          raw_lot = InpLotSize * MathPow(InpLotMultiplier, same_side_count);
+   }
+
+   // TINGKAT 2: Booster Lot Melampaui 6 Kotak M1 (Opsi 3)
+   if(is_booster_tier && InpBoosterLotMultiplier > 1.0)
+   {
+      raw_lot = raw_lot * InpBoosterLotMultiplier;
    }
 
    if(InpAutoOvertakeBreakRev && is_breakout_or_reversal && InpBasketDirection != BASKET_ONE_WAY)
@@ -1679,8 +1699,10 @@ void ManageBasketProfitAndLoss(const Tabranij &t, BasketExposure &exp)
    double sl_pct      = (balance > 0) ? (max_loss_money / balance * 100.0) : 0.0;
    double so_pct      = (balance > 0) ? (total_loss_at_so_money / balance * 100.0) : 0.0;
 
+   string micro_status = InpEnable10SecCycle ? StringFormat("AKTIF (Up: %d | Dn: %d) | %s", g_last_eval_up_ticks, g_last_eval_down_ticks, g_last_signal_info) : "NON-AKTIF (Bar M1 Mode)";
    string status_text = StringFormat(
-      "=== [GRAFIK TABRANIJ MONITOR v3.10 (ALL TIMEFRAMES)] ===\n" +
+      "=== [GRAFIK TABRANIJ MONITOR v3.20 (10s MIKRO)] ===\n" +
+      "Mikro 10s      : %s\n" +
       "Rangkaian Waktu: %s\n" +
       "Kotak Kedepan  : %s\n" +
       "Kompas MTF     : %s\n" +
@@ -1697,6 +1719,7 @@ void ManageBasketProfitAndLoss(const Tabranij &t, BasketExposure &exp)
       "2. Garis Target TP   : %s (+$%.2f / +%.2f%%)\n" +
       "3. Garis Batas Rugi  : %s (-$%.2f / -%.2f%%) [%s]\n" +
       "4. Garis Stop Out SO : %s (-$%.2f / -%.2f%%)\n",
+      micro_status,
       g_timeline_info,
       g_future_boxes_info,
       g_mtf_status_info,
@@ -1782,6 +1805,169 @@ void ManageBasketProfitAndLoss(const Tabranij &t, BasketExposure &exp)
 }
 
 //+------------------------------------------------------------------+
+//| Evaluasi Pemicu Mikro 10 Detik (Opsi 1, 2, 3)                     |
+//+------------------------------------------------------------------+
+bool Check10SecMicroTrigger(bool &out_buy, bool &out_sell, bool &out_is_booster,
+                            string &out_order_comment, string &out_signal_info)
+{
+   out_buy           = false;
+   out_sell          = false;
+   out_is_booster    = false;
+   out_order_comment = "";
+   out_signal_info   = "Standby 10s Window";
+
+   datetime now = TimeCurrent();
+   MqlDateTime dt;
+   TimeToStruct(now, dt);
+
+   // Slot window berbasis kelipatan 10 detik (misal detik 0-9, 10-19, dst.)
+   long current_window_key = (long)(now / 10);
+
+   if(g_last_10s_window_key < 0)
+   {
+      g_last_10s_window_key = current_window_key;
+      return false;
+   }
+
+   // Hanya evaluasi tepat di detik pergantian slot 10 detik (10, 20, 30, 40, 50, 00)
+   if(current_window_key == g_last_10s_window_key)
+   {
+      return false;
+   }
+
+   // Catat akumulasi tick dari 10 detik yang baru saja selesai
+   int up_ticks   = g_window_up_ticks;
+   int down_ticks = g_window_down_ticks;
+
+   g_last_eval_up_ticks   = up_ticks;
+   g_last_eval_down_ticks = down_ticks;
+
+   // Reset penghitung tick untuk jendela 10 detik berikutnya
+   g_window_up_ticks     = 0;
+   g_window_down_ticks   = 0;
+   g_last_10s_window_key = current_window_key;
+
+   // Jika pasar membeku (0 tick bergerak), tahan
+   if(up_ticks == 0 && down_ticks == 0)
+   {
+      out_signal_info = "10s Hold: Pasar Datar (0 Tick)";
+      return false;
+   }
+
+   // Ambil Anatomi Kotak GT M1 Bar 1 (Tutup) dan Bar 0 (Live)
+   Tabranij t1 = HitungTabranij(_Symbol, PERIOD_M1, 1);
+   Tabranij t0 = HitungTabranij(_Symbol, PERIOD_M1, 0);
+   if(t1.Waktu == 0 || t0.Waktu == 0)
+   {
+      out_signal_info = "Menunggu Data Bar M1...";
+      return false;
+   }
+
+   double current_bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+   // Ambil Ekstrem 6 Kotak M1 ke Belakang (T6 = Highest High, R6 = Lowest Low)
+   double highest_T6 = 0.0;
+   double lowest_R6  = 0.0;
+   GetExtremeTR(_Symbol, PERIOD_M1, 1, MathMax(1, InpLookback6Boxes), highest_T6, lowest_R6);
+
+   // =================================================================
+   // TINGKAT 2: OPSI 3 - MELAMPAUI 6 KOTAK M1 (BOOSTER LOT)
+   // =================================================================
+   // 3A. BREAKOUT 6 KOTAK M1
+   if(highest_T6 > 0.0 && current_bid > highest_T6 && up_ticks > down_ticks)
+   {
+      out_buy           = true;
+      out_is_booster    = true;
+      out_order_comment = StringFormat("GT Buy 10s Breakout T6 (Up %d vs Dn %d)", up_ticks, down_ticks);
+      out_signal_info   = StringFormat("BOOSTER: Breakout T6 M1 (+%d UpTicks)", up_ticks - down_ticks);
+      return true;
+   }
+   if(lowest_R6 > 0.0 && current_bid < lowest_R6 && down_ticks > up_ticks)
+   {
+      out_sell          = true;
+      out_is_booster    = true;
+      out_order_comment = StringFormat("GT Sell 10s Breakout R6 (Dn %d vs Up %d)", down_ticks, up_ticks);
+      out_signal_info   = StringFormat("BOOSTER: Breakout R6 M1 (+%d DnTicks)", down_ticks - up_ticks);
+      return true;
+   }
+
+   // 3B. REVERSAL / LIQUIDITY SWEEP 6 KOTAK (Menusuk di luar lalu ditarik mundur)
+   if(highest_T6 > 0.0 && t0.T > highest_T6 && current_bid < highest_T6 && down_ticks > up_ticks)
+   {
+      out_sell          = true;
+      out_is_booster    = true;
+      out_order_comment = StringFormat("GT Sell 10s Sweep T6 Rev (Dn %d vs Up %d)", down_ticks, up_ticks);
+      out_signal_info   = StringFormat("BOOSTER: Reversal Sweep T6 M1 (+%d DnTicks)", down_ticks - up_ticks);
+      return true;
+   }
+   if(lowest_R6 > 0.0 && t0.R < lowest_R6 && current_bid > lowest_R6 && up_ticks > down_ticks)
+   {
+      out_buy           = true;
+      out_is_booster    = true;
+      out_order_comment = StringFormat("GT Buy 10s Sweep R6 Rev (Up %d vs Dn %d)", up_ticks, down_ticks);
+      out_signal_info   = StringFormat("BOOSTER: Reversal Sweep R6 M1 (+%d UpTicks)", up_ticks - down_ticks);
+      return true;
+   }
+
+   // =================================================================
+   // TINGKAT 1: REGULER (DI DALAM RANGE 6 KOTAK M1 - LOT STANDAR)
+   // =================================================================
+
+   // OPSI 2: PANTULAN EKOR DOMINAN M1 (REJECTION ATAP / LANTAI)
+   if(InpEnableRejectionM1)
+   {
+      // Pantulan Lantai Ekor Bawah (ekb)
+      if(t1.EkorBawah > t1.EkorAtas && (t1.RasioPenolakanBawah >= 0.35 || t1.EkorBawah > t1.N))
+      {
+         if(current_bid <= (t1.B + (t1.J * 0.25)) && up_ticks > down_ticks)
+         {
+            out_buy           = true;
+            out_is_booster    = false;
+            out_order_comment = StringFormat("GT Buy 10s Rejection ekb (Up %d vs Dn %d)", up_ticks, down_ticks);
+            out_signal_info   = StringFormat("REGULER: Pantulan Ekor Bawah M1 (Up %d vs Dn %d)", up_ticks, down_ticks);
+            return true;
+         }
+      }
+      // Pantulan Atap Ekor Atas (eka)
+      if(t1.EkorAtas > t1.EkorBawah && (t1.RasioPenolakanAtas >= 0.35 || t1.EkorAtas > t1.N))
+      {
+         if(current_bid >= (t1.A - (t1.J * 0.25)) && down_ticks > up_ticks)
+         {
+            out_sell          = true;
+            out_is_booster    = false;
+            out_order_comment = StringFormat("GT Sell 10s Rejection eka (Dn %d vs Up %d)", down_ticks, up_ticks);
+            out_signal_info   = StringFormat("REGULER: Pantulan Ekor Atas M1 (Dn %d vs Up %d)", down_ticks, up_ticks);
+            return true;
+         }
+      }
+   }
+
+   // OPSI 1: FOLLOW TREN GT M1 SEBELUMNYA (SEARAH WARNA HIJAU/MERAH)
+   if(InpEnableFollowM1)
+   {
+      if(t1.IsNaik && up_ticks > down_ticks)
+      {
+         out_buy           = true;
+         out_is_booster    = false;
+         out_order_comment = StringFormat("GT Buy 10s Follow M1 Hijau (Up %d vs Dn %d)", up_ticks, down_ticks);
+         out_signal_info   = StringFormat("REGULER: Follow M1 Hijau (Up %d vs Dn %d)", up_ticks, down_ticks);
+         return true;
+      }
+      else if(!t1.IsNaik && down_ticks > up_ticks)
+      {
+         out_sell          = true;
+         out_is_booster    = false;
+         out_order_comment = StringFormat("GT Sell 10s Follow M1 Merah (Dn %d vs Up %d)", down_ticks, up_ticks);
+         out_signal_info   = StringFormat("REGULER: Follow M1 Merah (Dn %d vs Up %d)", down_ticks, up_ticks);
+         return true;
+      }
+   }
+
+   out_signal_info = StringFormat("10s Netral (Up %d vs Dn %d)", up_ticks, down_ticks);
+   return false;
+}
+
+//+------------------------------------------------------------------+
 //| Fungsi Utama Siklus Evaluasi & Eksekusi (Dipanggil Tick & Timer) |
 //+------------------------------------------------------------------+
 void RunTabranijCycle(bool allow_trade_execution)
@@ -1812,31 +1998,41 @@ void RunTabranijCycle(bool allow_trade_execution)
 
    if(!allow_trade_execution) return;
 
-   // 5. Cek Waktu Bar Aktif pada Timeframe Chart
-   datetime current_bar_time = iTime(_Symbol, exec_tf, 0);
-   if(current_bar_time == 0 || t1.Waktu == 0) return;
-
-   // Jika bar ini SUDAH berhasil dieksekusi, tunggu pergantian bar berikutnya
-   if(current_bar_time == last_exec_bar_time)
-   {
-      return;
-   }
-
-   // 6. Batasan Maksimal Posisi Terbuka
+   // 5. Batasan Maksimal Posisi Terbuka
    if(InpMaxOpenPositions > 0 && exp.total_count >= InpMaxOpenPositions)
    {
       g_last_signal_info = StringFormat("Hold: Posisi Penuh (%d/%d)", exp.total_count, InpMaxOpenPositions);
       return;
    }
 
-   // 7. Evaluasi Sinyal Anatomi Tabranij Lengkap & Dapatkan Komentar Spesifik Order
+   // 6. Evaluasi Sinyal Pemicu: Mode Mikro 10 Detik vs Mode Bar-by-Bar
    bool   raw_buy         = false;
    bool   raw_sell        = false;
    bool   is_break_or_rev = false;
+   bool   is_booster_tier = false;
    string order_comment   = "";
-   EvaluateTabranijSignal(t1, t2, raw_buy, raw_sell, is_break_or_rev, order_comment, g_last_signal_info);
 
-   if(!raw_buy && !raw_sell) return;
+   if(InpEnable10SecCycle)
+   {
+      if(!Check10SecMicroTrigger(raw_buy, raw_sell, is_booster_tier, order_comment, g_last_signal_info))
+      {
+         return;
+      }
+      is_break_or_rev = is_booster_tier;
+   }
+   else
+   {
+      datetime current_bar_time = iTime(_Symbol, exec_tf, 0);
+      if(current_bar_time == 0 || t1.Waktu == 0) return;
+
+      if(current_bar_time == last_exec_bar_time)
+      {
+         return;
+      }
+
+      EvaluateTabranijSignal(t1, t2, raw_buy, raw_sell, is_break_or_rev, order_comment, g_last_signal_info);
+      if(!raw_buy && !raw_sell) return;
+   }
 
    // 8. Saring Sinyal dengan Kompas Multi-Timeframe (MTF)
    if(raw_buy && !mtf_allow_buy)
@@ -1879,7 +2075,7 @@ void RunTabranijCycle(bool allow_trade_execution)
    // 10. Eksekusi Market Order & Pending Order Masa Depan (+1, +2, +3)
    if(raw_buy)
    {
-      double lot_to_open = CalculateNextLot(true, is_break_or_rev, exp);
+      double lot_to_open = CalculateNextLot(true, is_break_or_rev, exp, is_booster_tier);
       if(do_market_order)
       {
          if(SafeExecute(true, lot_to_open, order_comment))
@@ -1895,7 +2091,7 @@ void RunTabranijCycle(bool allow_trade_execution)
    }
    else if(raw_sell)
    {
-      double lot_to_open = CalculateNextLot(false, is_break_or_rev, exp);
+      double lot_to_open = CalculateNextLot(false, is_break_or_rev, exp, is_booster_tier);
       if(do_market_order)
       {
          if(SafeExecute(false, lot_to_open, order_comment))
@@ -1910,10 +2106,10 @@ void RunTabranijCycle(bool allow_trade_execution)
       if(pend > 0) executed_any = true;
    }
 
-   // Kunci waktu bar HANYA setelah order benar-benar berhasil tereksekusi
+   // Kunci waktu bar HANYA setelah order benar-benar berhasil tereksekusi (mode bar-by-bar)
    if(executed_any)
    {
-      last_exec_bar_time = current_bar_time;
+      last_exec_bar_time = iTime(_Symbol, exec_tf, 0);
    }
 }
 
@@ -1940,7 +2136,7 @@ int OnInit()
    RunTabranijCycle(false);
 
    ENUM_TIMEFRAMES exec_tf = GetExecTF();
-   Print(">>> [Tabranij Scalper v3.10] Aktif pada ", _Symbol, " (", EnumToString(exec_tf),
+   Print(">>> [Tabranij Scalper v3.20 (10s Micro Edition)] Aktif pada ", _Symbol, " (", EnumToString(exec_tf),
          ") | Riwayat: ", InpHistoryBarsToRead, " Bar -> Proyeksi Depan: +", InpFutureBarsToProject, " Bar");
    return INIT_SUCCEEDED;
 }
@@ -1970,6 +2166,14 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   double current_bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   if(g_last_tick_bid > 0.0)
+   {
+      if(current_bid > g_last_tick_bid + 0.000001)      g_window_up_ticks++;
+      else if(current_bid < g_last_tick_bid - 0.000001) g_window_down_ticks++;
+   }
+   g_last_tick_bid = current_bid;
+
    RunTabranijCycle(true);
 }
 //+------------------------------------------------------------------+

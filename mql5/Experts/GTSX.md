@@ -1,6 +1,6 @@
 # 📊 Grafik Tabranij Scalper XAUUSD (MQL5 Expert Advisor)
 
-**Versi Saat Ini:** `v3.10` (All-Timeframe Edition)  
+**Versi Saat Ini:** `v3.20` (10s Micro-Cycle & 120-Box Memory Edition)  
 **File Utama:** `Grafik_Tabranij_Scalper_XAUUSD.mq5`  
 **Arsitektur:** 100% Automated Trading — Standalone MQL5 (Tanpa Indikator Eksternal)  
 **Konsep Dasar:** *Genesis Riwayat Angka Faktual Informasi Keuangan (GRAFIK TABRANIJ)*
@@ -34,71 +34,77 @@ Berbeda dengan bot standar yang hanya mengenal istilah `Open, High, Low, Close`,
 
 ---
 
-## 2. Arsitektur Fitur yang Telah Terealisasi (`v3.10`)
+## 2. Arsitektur Fitur yang Telah Terealisasi (`v3.20`)
 
-### A. Pilar 1 — 6 Mode Sinyal Tabranij & Pelabelan Komentar Otomatis
+### A. Pilar Waktu: Mikro-Siklus 10 Detik & Memori 120 Kotak M1 (Fitur Terbaru `v3.20`)
+1. **Memori 120 Kotak M1 (2 Jam Siklus Pasar):**
+   - Bot membaca dan mengingat hingga **120 kotak M1 ke belakang** (`InpHistoryBarsToRead = 120`), mencakup tepat **2 jam penuh** dinamika harga emas.
+   - Mengidentifikasi batas tertinggi ($T_{120}$) dan terendah ($R_{120}$) 2 jam sebagai dinding support & resistance alamiah tanpa membebani memori CPU/VPS.
+2. **Mesin Pemicu Mikro 10 Detik (Ultra-High Frequency / 6x Entry per Menit):**
+   - Lilin M1 (60 detik) dibagi menjadi **6 jendela mikro 10 detik**:
+     - Detik `00–09` $\to$ Eksekusi pada detik **10**
+     - Detik `10–19` $\to$ Eksekusi pada detik **20**
+     - Detik `20–29` $\to$ Eksekusi pada detik **30**
+     - Detik `30–39` $\to$ Eksekusi pada detik **40**
+     - Detik `40–49` $\to$ Eksekusi pada detik **50**
+     - Detik `50–59` $\to$ Eksekusi pada detik **00**
+   - Menghitung aliran order real-time (`UpTicks` vs `DownTicks`) selama 10 detik berjalan.
+3. **Sistem Tingkat Lot Dinamis (Opsi 1, Opsi 2, Opsi 3):**
+   - **Tingkat 1 (Reguler - Lot Standar):** Di dalam range 6 kotak M1:
+     - **Opsi 1 (Follow Tren M1):** Searah dengan warna candle GT M1 sebelumnya (Hijau + `UpTicks > DownTicks` $\to$ **BUY**; Merah + `DownTicks > UpTicks` $\to$ **SELL**).
+     - **Opsi 2 (Pantulan Ekor M1):** Menangkap pembalikan arah saat harga menguji atap/lantai ekor dominan M1 sebelumnya ($eka_1 / ekb_1$).
+   - **Tingkat 2 (Super Booster - Lot Dinaikkan / Pengali):**
+     - **Opsi 3 (Melampaui 6 Kotak M1 Sebelumnya):** Mengacu pada titik tertinggi ($T_6$) dan terendah ($R_6$) dari 6 menit terakhir:
+       - **Breakout 6 Kotak:** Menembus ke atas $T_6$ + `UpTicks` $\to$ **BUY BOOSTER** (Lot dikalikan `InpBoosterLotMultiplier`).
+       - **Breakout 6 Kotak:** Menembus ke bawah $R_6$ + `DownTicks` $\to$ **SELL BOOSTER** (Lot dikalikan `InpBoosterLotMultiplier`).
+       - **Reversal Sweep 6 Kotak:** Menusuk keluar $T_6/R_6$ lalu ditarik mundur + tick berbalik $\to$ **BOOSTER REVERSAL** dengan lot ditingkatkan untuk mempercepat panen keranjang.
+
+---
+
+### B. Pilar 1 — 6 Mode Sinyal Tabranij & Pelabelan Komentar Otomatis
 Setiap order yang dieksekusi oleh bot memiliki **komentar alasan spesifik (`Order Comment`)** yang tampil di tab *Trade / History* MT5:
 
 1. **`MODE_FOLLOW_TREND`:** Mengikuti arah `Neto` candle (`Hijau = BUY`, `Merah = SELL`).
-   - *Comment:* `GT Buy neto 80%`, `GT Sell neto 75%`
 2. **`MODE_COUNTER_TREND`:** Melawan arah `Neto` candle untuk menangkap pantulan.
-   - *Comment:* `GT Buy neto 80%`, `GT Sell neto 75%`
-3. **`MODE_REJECTION_EKOR`:** Membaca dominasi `eka` (Ekor Atas) dan `ekb` (Ekor Bawah). Dilengkapi saklar `InpEkorDirection`:
-   - `EKOR_EKA_BUY_EKB_SELL`: Ekor Atas dominan = **BUY**, Ekor Bawah dominan = **SELL**.
-   - `EKOR_EKB_BUY_EKA_SELL`: Ekor Bawah dominan = **BUY**, Ekor Atas dominan = **SELL**.
-   - *Comment:* `GT Buy eka 80%`, `GT Sell ekb 80%`, `GT Buy ekb 80%`, `GT Sell eka 80%`
-4. **`MODE_BREAKOUT`:** Mendeteksi saat `Inti (I)` menembus atap `Tinggi (T)` atau lantai `Rendah (R)` dari N kotak sebelumnya.
-   - *Comment:* `GT Buy breakout`, `GT Sell breakout`
-5. **`MODE_REVERSAL`:** Mendeteksi *Liquidity Sweep* (harga menembus `T`/`R` lalu ditarik masuk kembali meninggalkan ekor panjang) atau *Engulfing Neto* (`N` menelan badan kotak sebelumnya).
-   - *Comment:* `GT Buy reversal`, `GT Sell reversal`
-6. **`MODE_SMART_HYBRID` (Default):** Menggabungkan keempat logika di atas secara berurutan tanpa celah kosong (*Zero Dead-Zone*):
-   `Breakout -> Reversal -> Ekor Dominan (eka/ekb) -> Neto Dominan (neto)`
+3. **`MODE_REJECTION_EKOR`:** Membaca dominasi `eka` (Ekor Atas) dan `ekb` (Ekor Bawah).
+4. **`MODE_BREAKOUT`:** Mendeteksi saat `Inti (I)` menembus atap `Tinggi (T)` atau lantai `Rendah (R)`.
+5. **`MODE_REVERSAL`:** Mendeteksi *Liquidity Sweep* atau *Engulfing Neto*.
+6. **`MODE_SMART_HYBRID` (Default):** Menggabungkan keempat logika di atas secara berurutan (*Zero Dead-Zone*).
 
 ---
 
-### B. Proyeksi Kotak Masa Depan (`+1, +2, +3`) & Pending Order (`Limit` / `Stop`)
-Bot membaca sejumlah kotak historis ke belakang (`InpHistoryBarsToRead`, default `4` kotak) + kotak `Live (Bar 0)` untuk memproyeksikan kotak yang **akan terjadi ke depan** (`InpFutureBarsToProject`, default `3` kotak: `+1, +2, +3`) di **semua Timeframe (`M1, M5, M15, M30, H1, H4, D1`)**:
-
-1. **Rumus Proyeksi Masa Depan (`CalculateFutureProjections`):**
-   - Menghitung rata-rata terbobot (*Linear Weighted Average*) dari `VektorNeto`, `N`, `J`, `EkorAtas`, dan `EkorBawah` pada 4 kotak terakhir.
-   - Menggabungkan kecepatan historis (65%) dengan kecepatan berjalan `Bar 0` (35%).
-   - Menerapkan faktor redaman (*Damping Factor* `0.92^k`) untuk menentukan `Awal`, `Inti`, `Atas (A)`, `Bawah (B)`, `Tinggi (T)`, dan `Rendah (R)` pada kotak `+1, +2, +3`.
-2. **Visualisasi Kotak Bayangan di Kanan Chart (`DrawFutureBoxesOnChart`):**
-   - Menggambar bingkai luar Julat (`T` ke `R`), kotak blok badan Neto (`A` ke `B`), garis ekor vertikal, dan label waktu `+1, +2, +3` di sebelah kanan candle berjalan.
-3. **Eksekusi Pending Order Masa Depan (`PlaceFuturePendingOrders`):**
-   - **Saat Sinyal BUY:** Memasang `Buy Limit` di proyeksi **Rendah (`R+1, R+2, R+3`)** dan/atau `Buy Stop` di proyeksi **Tinggi (`T+1, T+2, T+3`)**.
-   - **Saat Sinyal SELL:** Memasang `Sell Limit` di proyeksi **Tinggi (`T+1, T+2, T+3`)** dan/atau `Sell Stop` di proyeksi **Rendah (`R+1, R+2, R+3`)**.
+### C. Proyeksi Kotak Masa Depan (`+1, +2, +3`) & Pending Order (`Limit` / `Stop`)
+Bot memproyeksikan kotak yang **akan terjadi ke depan** (`InpFutureBarsToProject`, default `3` kotak: `+1, +2, +3`) di **semua Timeframe (`M1, M5, M15, M30, H1, H4, D1`)**:
+1. Menghitung rata-rata terbobot (*Linear Weighted Average*) dari `VektorNeto`, `N`, `J`, `EkorAtas`, dan `EkorBawah` dengan faktor redaman $0.92^k$.
+2. Menggambar visual kotak bayangan masa depan di sebelah kanan candle berjalan.
+3. Memasang pending order `Limit` dan `Stop` di proyeksi level $T$ dan $R$.
 
 ---
 
-### C. Pilar 2 — Kontrol Layer, Anti-Kunci (*Anti-Lock*), & *Auto-Overtake*
+### D. Pilar 2 — Kontrol Layer, Anti-Kunci (*Anti-Lock*), & *Auto-Overtake*
 1. **Mode Arah Keranjang (`ENUM_BASKET_DIRECTION`):**
-   - `BASKET_MIXED_ANTI_LOCK`: Mengizinkan posisi BUY & SELL bersamaan tetapi **mencegah `Lot BUY == Lot SELL`** (otomatis menambah `+0.01 lot` jika total lot akan terkunci `0.00` agar garis BEP/TP/SL tidak pernah hilang).
+   - `BASKET_MIXED_ANTI_LOCK`: Mencegah `Lot BUY == Lot SELL` (otomatis menambah `+0.01 lot` jika total lot akan terkunci `0.00` agar garis BEP/TP/SL tidak hilang).
    - `BASKET_ONE_WAY`: Mengunci 1 arah saja sampai keranjang selesai panen TP/SL.
-   - `BASKET_SEPARATE_BUY_SELL`: Memisahkan keranjang BUY dan keranjang SELL agar bisa panen TP masing-masing.
+   - `BASKET_SEPARATE_BUY_SELL`: Memisahkan keranjang BUY dan SELL.
 2. **Filter Jarak Antar Order (`ENUM_STEP_MODE`):**
-   - `STEP_FREE` (Bebas tiap bar), `STEP_MIN_DISTANCE` (Jarak minimal X poin dari order terakhir), atau `STEP_AVERAGING_ONLY` (Hanya tambah layer saat harga minus sejauh X poin).
+   - `STEP_FREE` (Bebas tiap bar), `STEP_MIN_DISTANCE`, atau `STEP_AVERAGING_ONLY`.
 3. **Progresi Lot & *Auto-Overtake* (`CalculateNextLot`):**
    - Mendukung `LOT_FIXED`, `LOT_ADDER` (+), dan `LOT_MULTIPLIER` (x) dengan batas aman `InpMaxLotSize`.
-   - **Fitur *Auto-Overtake*:** Saat muncul sinyal `Breakout` atau `Reversal` yang berlawanan dengan posisi yang sedang floating minus, bot otomatis membuka lot sebesar `Net Lot Lawan * InpOvertakeLotFactor` untuk langsung membalikkan arah eksposur keranjang.
+   - **Fitur *Auto-Overtake*:** Membalikkan eksposur keranjang saat sinyal Breakout/Reversal terdeteksi.
 
 ---
 
-### D. Visualisasi 6 Garis Real-Time di Chart (`UpdateChartLines`)
-Setiap *tick* dan setiap 1 detik (`OnTimer`), bot menghitung ulang dan menggambar 6 garis horizontal beserta label informasinya di chart:
-
-1. 🔵 **Garis `EXPOSURE BUY`:** Titik impas rata-rata (*weighted breakeven*) seluruh posisi BUY + info jumlah posisi, total lot BUY, floating BUY, dan lot *Auto-Overtake*.
-2. 🔴 **Garis `EXPOSURE SELL`:** Titik impas rata-rata (*weighted breakeven*) seluruh posisi SELL + info jumlah posisi, total lot SELL, floating SELL, dan lot *Auto-Overtake*.
-3. 🟡 **Garis `BEP ($0.00)`:** Titik harga di mana total profit bersih seluruh keranjang (BUY + SELL + Swap) tepat mencapai `$0.00`.
-4. 🟢 **Garis `TARGET TP`:** Titik harga di mana keranjang akan otomatis ditutup sapu bersih karena mencapai target profit (`$ USD` atau `% Saldo`).
-5. 🟠 **Garis `BATAS RUGI (SL)`:** Titik harga di mana keranjang akan otomatis *Cut Loss* darurat sesuai batas rugi (`$ USD` atau `% Saldo`).
-6. 🟣 **Garis `STOP OUT (SO)`:** Titik harga peringatan ketahanan maksimal akun berdasarkan `Equity`, `Margin`, dan `Stop Out Level %` broker.
+### E. Visualisasi 6 Garis Real-Time di Chart (`UpdateChartLines`)
+1. 🔵 **Garis `EXPOSURE BUY`:** Titik impas rata-rata (*weighted breakeven*) posisi BUY.
+2. 🔴 **Garis `EXPOSURE SELL`:** Titik impas rata-rata (*weighted breakeven*) posisi SELL.
+3. 🟡 **Garis `BEP ($0.00)`:** Titik harga di mana total profit bersih keranjang mencapai `$0.00`.
+4. 🟢 **Garis `TARGET TP`:** Titik harga di mana keranjang akan otomatis ditutup sapu bersih.
+5. 🟠 **Garis `BATAS RUGI (SL)`:** Titik harga *Cut Loss* darurat keranjang.
+6. 🟣 **Garis `STOP OUT (SO)`:** Titik harga peringatan batas ketahanan akun broker.
 
 ---
 
 ## 3. Peta Fungsi Kode (`Code Map`)
-
-Gunakan peta fungsi ini sebagai panduan cepat ketika ingin memodifikasi atau menambahkan fitur baru di `Grafik_Tabranij_Scalper_XAUUSD.mq5`:
 
 ```text
 Grafik_Tabranij_Scalper_XAUUSD.mq5
@@ -110,6 +116,10 @@ Grafik_Tabranij_Scalper_XAUUSD.mq5
 │   ├── GetExecTF()                       -> Menentukan Timeframe aktif (otomatis ikuti _Period)
 │   └── GetEffectiveTrendTF()             -> Menentukan Timeframe Kompas MTF secara dinamis
 │
+├── Modul Mikro-Siklus 10 Detik (v3.20)
+│   ├── Check10SecMicroTrigger()          -> Evaluasi aliran tick 10 detik + GT M1 (Opsi 1, 2, 3)
+│   └── OnTick() (Tick Flow Tracking)     -> Merekam UpTicks vs DownTicks live per jendela 10s
+│
 ├── Modul Proyeksi Masa Depan (+1, +2, +3)
 │   ├── CalculateFutureProjections()      -> Menghitung anatomi kotak masa depan (+1, +2, +3)
 │   ├── DrawFutureBoxesOnChart()          -> Menggambar kotak bayangan masa depan di kanan chart
@@ -118,12 +128,12 @@ Grafik_Tabranij_Scalper_XAUUSD.mq5
 │
 ├── Modul Sinyal & Filter (Pilar 1 & Pilar 2)
 │   ├── EvaluateMTFCompass()              -> Evaluasi filter tren Timeframe Besar
-│   ├── EvaluateTabranijSignal()          -> Otak sinyal 6 mode + pembuat komentar order spesifik
+│   ├── EvaluateTabranijSignal()          -> Otak sinyal 6 mode bar-by-bar
 │   ├── CheckLayerAndStepPermission()     -> Validasi arah keranjang & jarak minimal antar order
-│   └── CalculateNextLot()                -> Kalkulasi lot (Fixed/Adder/Multiplier + Auto-Overtake)
+│   └── CalculateNextLot()                -> Kalkulasi lot (+ Booster Lot Opsi 3 & Auto-Overtake)
 │
 ├── Modul Eksekusi & Manajemen Keranjang
-│   ├── SafeExecute()                     -> Eksekusi Market Order anti-error 10030 (Auto-Filling)
+│   ├── SafeExecute()                     -> Eksekusi Market Order anti-error 10030
 │   ├── ClosePositionsBySide()            -> Sapu bersih posisi (Semua / Hanya BUY / Hanya SELL)
 │   ├── DeleteAllPendingOrders()          -> Menghapus seluruh pending order saat keranjang selesai
 │   ├── CalculateTargets()                -> Kalkulasi nominal USD untuk TP, SL, dan Stop Out
@@ -133,40 +143,17 @@ Grafik_Tabranij_Scalper_XAUUSD.mq5
 └── Siklus Utama Event MT5
     ├── RunTabranijCycle()                -> Orkestrator utama yang menyatukan seluruh modul
     ├── OnInit()                          -> Inisialisasi Chart Shift, Timer 1 detik, & gambar awal
-    ├── OnTimer()                         -> Detak otomatis tiap 1 detik (aktif meski pasar lambat)
-    ├── OnTick()                          -> Detak real-time setiap harga bergerak
+    ├── OnTimer()                         -> Detak otomatis tiap 1 detik (update garis & periksa 10s)
+    ├── OnTick()                          -> Detak real-time tick flow & eksekusi instan
     └── OnDeinit()                        -> Pembersihan objek chart saat EA dilepas
 ```
 
 ---
 
-## 4. Roadmap Pengembangan Selanjutnya (Siap Dibangun)
-
-Agar pengembangan berikutnya terarah dan modular, berikut adalah daftar fitur lanjutan (**Pilar 3, Pilar 4, dan Pilar 5**) yang sudah disiapkan tempatnya di dalam arsitektur kode:
-
-### 🚀 Tahap Berikutnya: Pilar 3 — *Basket Trailing Profit / Lock Profit*
-- **Tujuan:** Mengamankan profit yang sudah didapat agar tidak berbalik menjadi minus jika harga memantul beberapa sen sebelum menyentuh garis Target TP utama.
-- **Mekanisme yang Akan Ditambahkan:**
-  - `InpUseTrailingProfit`: Saklar pengunci profit keranjang.
-  - `InpTrailStartUSD` / `%`: Titik aktivasi pengunci (misal: saat profit menyentuh `+$3.00`, kunci profit di `+$1.50`).
-  - `InpTrailStepUSD`: Jarak geser pengunci saat profit terus naik ke `+$4.00`, `+$5.00`, dst.
-  - **Garis Visual Ke-7 (`GARIS LOCK PROFIT`):** Garis berwarna *Cyan/Aqua* di chart yang bergerak naik/turun mengawal harga secara *live*.
-
-### 🛡️ Pilar 4 — *Execution & Daily Risk Guard* (Pelindung Akun Harian)
-- **Filter Spread Maksimal (`InpMaxSpreadPoints`):** Menahan pembukaan order baru jika spread XAUUSD sedang melebar ekstrem saat rilis berita/pergantian sesi.
-- **Kalkulasi Komisi ECN Akurat:** Menambahkan perhitungan `DEAL_COMMISSION` ke dalam `CollectBasketExposure()` agar pada akun *Raw/Zero Spread*, garis `BEP` dan `TP` sudah memperhitungkan potongan komisi broker.
-- **Target Profit & Batas Rugi Harian (`Daily Target & Daily Drawdown Stop`):** Otomatis menghentikan bot untuk sisa hari tersebut jika target keuntungan harian sudah tercapai.
-- **Filter Jam Sesi Trading (`Asia / London / New York`).**
-
-### ✂️ Pilar 5 — *Smart Partial Close (Cicil Tutup Posisi Terjauh)*
-- Menutup otomatis posisi paling ujung yang sedang floating minus besar menggunakan sebagian profit dari posisi *overtake* atau layer terbaru yang sedang profit, sehingga beban lot keranjang selalu ringan.
-
----
-
-## 5. Cara Pemasangan & Kompilasi di MetaTrader 5
+## 4. Cara Pemasangan & Kompilasi di MetaTrader 5
 
 1. Buka **MetaTrader 5** -> Tekan **`F4`** untuk membuka **MetaEditor**.
-2. Buka atau buat file `Grafik_Tabranij_Scalper_XAUUSD.mq5` di dalam folder `MQL5/Experts/`.
-3. Tempelkan (*Paste*) seluruh kode terbaru dan tekan **`F7` (Compile)** — pastikan `0 errors, 0 warnings`.
+2. Buka file `Grafik_Tabranij_Scalper_XAUUSD.mq5` di dalam folder `MQL5/Experts/`.
+3. Tekan **`F7` (Compile)** — pastikan `0 errors, 0 warnings`.
 4. Pada jendela MT5, pastikan tombol **`Algo Trading`** di toolbar atas berwarna **Hijau**.
-5. Pasang EA ke chart **XAUUSD** dan klik bebas tombol timeframe (**M1, M5, M15, M30, H1**) — kotak proyeksi masa depan `+1, +2, +3` serta 6 garis visual akan otomatis menyesuaikan dalam 1 detik.
+5. Pasang EA ke chart **XAUUSD M1** — bot akan otomatis menghitung riwayat 120 kotak dan mengevaluasi pemicu mikro 10 detik dengan informasi *UpTicks vs DownTicks* langsung di dashboard chart.
