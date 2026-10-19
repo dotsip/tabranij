@@ -18,8 +18,8 @@ Berbeda dengan bot standar yang hanya mengenal istilah `Open, High, Low, Close`,
 | **B** | `B` (Bawah) | `min(Awal, Inti) - R` | Panjang jarum/ekor bawah (penolakan bawah) |
 | **R** | `R` (Rendah) | `Low` | Titik harga terendah yang dicapai pada kotak waktu |
 | **A** | `A` (Awal) | `Open` | Harga pembukaan saat kotak waktu dimulai |
-| **I** | `I` (Inti) | `Close` / `Live Price` | Harga penutupan (atau harga berjalan saat ini pada Bar `0`) |
 | **N** | `N` (Neto) | `|Inti - Awal|` | Panjang murni badan kotak (perpindahan bersih harga) |
+| **I** | `I` (Inti) | `Close` / `Live Price` | Harga penutupan (atau harga berjalan saat ini pada Bar `0`) |
 | **J** | `J` (Julat) | `T - R` | Rentang total pergerakan kotak waktu |
 
 ### 3 Rasio Utama Tabranij:
