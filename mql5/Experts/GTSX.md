@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Filosofi & Anatomi Grafik Tabranij (`T-A-B-R-A-I-N-J`)
+## 1. Filosofi & Anatomi Grafik Tabranij (`T-A-B-R-A-N-I-J`)
 
 Berbeda dengan bot standar yang hanya mengenal istilah `Open, High, Low, Close`, bot ini membaca setiap kotak waktu (*candlestick*) melalui **Anatomi Murni Grafik Tabranij** yang membedah kekuatan dorongan badan (*Neto*) dan tolakan ekor (*Atas* & *Bawah*) secara matematis dan tanpa ambiguitas:
 
