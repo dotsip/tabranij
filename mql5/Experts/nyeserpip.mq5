@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
-//|                                                    nyeserpip.mq5 |
-//|           Full-margin basket EA: profit/loss % + target lines    |
-//|                           Window key: 1970 (detik Unix epoch)    |
+//|                                                   nyeserpip.mq5 |
+//|            Full-margin basket EA: profit/loss % + target lines    |
+//|                    Window key: 1970 (detik Unix epoch)          |
 //+------------------------------------------------------------------+
 #property copyright "nyeserpip"
 #property version   "1.05"          // Versi UI/UX terbaru
@@ -16,31 +16,31 @@ enum ENUM_NYESER_DIR
   };
 
 input group "nyeserpip"
-input long            InpMagic                = 1970;           // Magic / window key
-input bool            InpEnableTrading        = true;           // Buka posisi otomatis
-input ENUM_NYESER_DIR InpDirection            = NYESER_BUY;     // Arah full margin
-input double          InpMarginUsagePercent   = 95.0;           // Pemakaian margin (%)
-input int             InpSliceCount           = 5;              // Jumlah tiket (pecahan full margin)
-input int             InpSliceDelaySeconds    = 1;              // Jeda antar tiket (detik)
-input double          InpProfitBasketPercent  = 1.0;            // Keranjang profit (%)
-input double          InpLossLimitPercent     = 1.0;            // Batas rugi (%)
-input int             InpReentryDelaySeconds  = 0;              // Jeda buka ulang setelah keranjang (detik)
-input int             InpMaxBasketSeconds     = 0;              // Batas waktu keranjang (0=off)
-input int             InpSlippagePoints       = 30;             // Slippage (points)
-input int             InpTimerSeconds         = 1;              // Refresh window (detik)
-input bool            InpFitChartToLines      = true;           // Sesuaikan skala chart ke garis
-input bool            InpEntryAtSecond00      = true;           // Entry hanya saat detik 00
+input long           InpMagic                = 1970;             // Magic / window key
+input bool           InpEnableTrading        = true;             // Buka posisi otomatis
+input ENUM_NYESER_DIR InpDirection           = NYESER_BUY;       // Arah full margin
+input double         InpMarginUsagePercent   = 95.0;             // Pemakaian margin (%)
+input int            InpSliceCount           = 5;                // Jumlah tiket (pecahan full margin)
+input int            InpSliceDelaySeconds    = 1;                // Jeda antar tiket (detik)
+input double         InpProfitBasketPercent  = 1.0;              // Keranjang profit (%)
+input double         InpLossLimitPercent     = 1.0;              // Batas rugi (%)
+input int            InpReentryDelaySeconds  = 0;                // Jeda buka ulang setelah keranjang (detik)
+input int            InpMaxBasketSeconds     = 0;                // Batas waktu keranjang (0=off)
+input int            InpSlippagePoints       = 30;               // Slippage (points)
+input int            InpTimerSeconds         = 1;                // Refresh window (detik)
+input bool           InpFitChartToLines      = true;             // Sesuaikan skala chart ke garis
+input bool           InpEntryAtSecond00      = true;             // Entry hanya saat detik 00
 
 CTrade trade;
 long   g_chart = 0;
 
-const string OBJ_KEY          = "1970";
-const string OBJ_WINDOW       = "1970_window";
-const string OBJ_SECONDS      = "1970_seconds";
-const string OBJ_STATUS       = "1970_status";
-const string OBJ_LINE_PROFIT  = "1970_line_profit";
-const string OBJ_LINE_LOSS    = "1970_line_loss";
-const string OBJ_LINE_SO      = "1970_line_so";
+const string OBJ_KEY         = "1970";
+const string OBJ_WINDOW      = "1970_window";
+const string OBJ_SECONDS     = "1970_seconds";
+const string OBJ_STATUS      = "1970_status";
+const string OBJ_LINE_PROFIT = "1970_line_profit";
+const string OBJ_LINE_LOSS   = "1970_line_loss";
+const string OBJ_LINE_SO     = "1970_line_so";
 
 datetime g_basketStart   = 0;
 datetime g_lastCloseTime = 0;
@@ -291,9 +291,9 @@ bool OpenSlice(const ENUM_ORDER_TYPE type, const double lots)
       if(g_basketStart == 0)
          g_basketStart = TimeCurrent();
       g_lastAction = "tiket " + IntegerToString(CountOurPositions())
-                     + "/" + IntegerToString(SliceCount())
-                     + "  lot " + DoubleToString(lots, 2)
-                     + "  total " + DoubleToString(OurVolume(), 2);
+                   + "/" + IntegerToString(SliceCount())
+                   + "  lot " + DoubleToString(lots, 2)
+                   + "  total " + DoubleToString(OurVolume(), 2);
      }
    else
       g_lastAction = "gagal order: " + IntegerToString(trade.ResultRetcode());
@@ -307,58 +307,75 @@ void MaybeOpenFullMargin()
       return;
 
    ENUM_ORDER_TYPE type = (InpDirection == NYESER_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-   int    count   = CountOurPositions();
-   int    slices  = SliceCount();
-   double minLot  = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
-   double haveVol = OurVolume();
+   int     count    = CountOurPositions();
+   int     slices   = SliceCount();
+   double minLot   = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
 
    if(count == 0)
      {
-      if(InpEntryAtSecond00 && ServerSeconds() != 0)
+      if(g_lastCloseTime > 0 && InpReentryDelaySeconds > 0 && (TimeCurrent() - g_lastCloseTime) < InpReentryDelaySeconds)
+        {
+         g_lastAction = "tunggu jeda re-entry";
+         return;
+        }
+
+      if(InpEntryAtSecond00 && ServerSeconds() != 0 && g_lastCloseTime == 0)
         {
          g_lastAction = "tunggu detik 00";
          return;
         }
-      if(g_lastCloseTime > 0 && (TimeCurrent() - g_lastCloseTime) < InpReentryDelaySeconds)
-         return;
 
       g_targetLots = FullMarginLots(type);
       g_sliceLots  = NormalizeVolume(g_targetLots / slices);
       if(g_sliceLots < minLot)
          g_sliceLots = minLot;
+         
       if(g_targetLots <= 0.0 || g_sliceLots <= 0.0)
         {
          g_lastAction = "lot full margin = 0";
          return;
         }
-      OpenSlice(type, g_sliceLots);
+        
+      if(OpenSlice(type, g_sliceLots))
+        {
+         g_lastCloseTime = 0;
+        }
       return;
      }
 
    if(count >= slices)
       return;
+      
    if(g_targetLots <= 0.0)
      {
+      double haveVol = OurVolume();
       g_targetLots = NormalizeVolume(haveVol + FullMarginLots(type));
       int remain = slices - count;
       g_sliceLots = (remain > 0) ? NormalizeVolume((g_targetLots - haveVol) / remain) : minLot;
      }
-   if(haveVol >= g_targetLots - (minLot * 0.5))
+     
+   double haveVolCheck = OurVolume();
+   if(haveVolCheck >= g_targetLots - (minLot * 0.5))
       return;
+      
    if(InpSliceDelaySeconds > 0 && g_lastSliceTime > 0
       && (TimeCurrent() - g_lastSliceTime) < InpSliceDelaySeconds)
       return;
+      
    if(InpSliceDelaySeconds <= 0 && g_lastSliceTime == TimeCurrent())
       return;
 
-   double remaining = NormalizeVolume(g_targetLots - haveVol);
+   double remaining = NormalizeVolume(g_targetLots - haveVolCheck);
    double lots      = MathMin(g_sliceLots, remaining);
    double afford    = FullMarginLots(type);
+   
    if(afford < minLot || lots < minLot)
       return;
+      
    lots = NormalizeVolume(MathMin(lots, afford));
    if(lots < minLot)
       return;
+      
    OpenSlice(type, lots);
   }
 
@@ -603,7 +620,7 @@ void CreateWindow()
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_XSIZE, 380);
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_YSIZE, 132);
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BGCOLOR, C'12,16,24');
-      ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BORDER_TYPE, BORDER_RAISED);  // Border full sekarang
+      ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BORDER_TYPE, BORDER_RAISED);
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_COLOR, C'0,180,255');
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_WIDTH, 1);
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BACK, false);
@@ -645,20 +662,20 @@ void UpdateWindow()
    double balance = AccountInfoDouble(ACCOUNT_BALANCE);
    double pct = (balance > 0.0) ? (profit / balance) * 100.0 : 0.0;
 
-   string secLine = "1970  detik " + IntegerToString(unixSeconds) + "   keranjang " + IntegerToString(basketSec) + "s";
+   string secLine = "1970  detik " + IntegerToString(unixSeconds) + "    keranjang " + IntegerToString(basketSec) + "s";
    string stLine  = StringFormat(
-                       "nyeserpip  P/L %.2f%%  (TP %.2f / rugi %.2f)\ntiket %d/%d  lot %.2f/%.2f  %s\n%s",
-                       pct,
-                       InpProfitBasketPercent,
-                       InpLossLimitPercent,
-                       CountOurPositions(),
-                       SliceCount(),
-                       OurVolume(),
-                       g_targetLots,
-                       g_lastAction,
-                       g_lineInfo);
+                    "nyeserpip  P/L %.2f%%  (TP %.2f / rugi %.2f)\ntiket %d/%d  lot %.2f/%.2f  %s\n%s",
+                    pct,
+                    InpProfitBasketPercent,
+                    InpLossLimitPercent,
+                    CountOurPositions(),
+                    SliceCount(),
+                    OurVolume(),
+                    g_targetLots,
+                    g_lastAction,
+                    g_lineInfo);
 
    ObjectSetString(g_chart, OBJ_SECONDS, OBJPROP_TEXT, secLine);
    ObjectSetString(g_chart, OBJ_STATUS, OBJPROP_TEXT, stLine);
   }
-//+------------------------------------------------------
+//+------------------------------------------------------------------+
