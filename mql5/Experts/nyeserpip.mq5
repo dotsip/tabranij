@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
-//|                                                    nyeserpip.mq5 |
+//|                                                   nyeserpip.mq5 |
 //|            Full-margin basket EA: profit/loss % + target lines   |
-//|                     Window key: 1970 (detik Unix epoch)          |
+//|                    Window key: 1970 (detik Unix epoch)          |
 //+------------------------------------------------------------------+
 #property copyright "nyeserpip"
-#property version   "1.06"          // Tambah fitur bunyi open & close
+#property version   "1.11"          // Original Entry + 60% Counter Hedge
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -31,6 +31,10 @@ input int            InpTimerSeconds         = 1;                // Refresh wind
 input bool           InpFitChartToLines      = true;             // Sesuaikan skala chart ke garis
 input bool           InpEntryAtSecond00      = true;             // Entry hanya saat detik 00
 
+input group "Hedging Pembalikan"
+input double         InpHedgeTriggerPercent  = 60.0;             // Trigger Hedging di Floating Loss (% dari Loss Limit)
+input bool           InpAutoSwitchDir        = true;             // Otomatis balik arah untuk siklus berikutnya jika kena Hedge
+
 input group "Fitur Suara"
 input string         InpSoundOnClose         = "ok.wav";         // Suara saat close keranjang
 input string         InpSoundOnOpen          = "expert.wav";     // Suara saat open posisi/slice
@@ -54,6 +58,9 @@ double   g_sliceLots     = 0.0;
 string   g_lastAction    = "idle";
 string   g_lineInfo      = "";
 
+ENUM_NYESER_DIR g_currentDir = NYESER_BUY;
+bool     g_isHedged          = false;
+
 //+------------------------------------------------------------------+
 int OnInit()
   {
@@ -62,6 +69,8 @@ int OnInit()
    trade.SetDeviationInPoints(InpSlippagePoints);
    trade.SetAsyncMode(false);
    ApplyFillingMode();
+
+   g_currentDir = InpDirection;
 
    if(AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
       Print("nyeserpip: akun netting menggabungkan tiket. Pakai akun hedging agar pecahan full margin jadi beberapa posisi.");
@@ -186,7 +195,6 @@ void CloseBasket(const string reason)
       trade.PositionClose(ticket);
      }
    
-   // Bunyi audio saat keranjang ditutup
    if(StringLen(InpSoundOnClose) > 0)
       PlaySound(InpSoundOnClose);
 
@@ -194,6 +202,7 @@ void CloseBasket(const string reason)
    g_basketStart   = 0;
    g_targetLots    = 0.0;
    g_sliceLots     = 0.0;
+   g_isHedged      = false;
    g_lastAction    = reason;
   }
 
@@ -207,6 +216,7 @@ void ManageBasket()
    if(CountOurPositions() == 0)
      {
       g_basketStart = 0;
+      g_isHedged    = false;
       return;
      }
 
@@ -231,7 +241,32 @@ void ManageBasket()
       return;
      }
    if(InpMaxBasketSeconds > 0 && elapsed >= InpMaxBasketSeconds)
+     {
       CloseBasket("batas detik keranjang");
+      return;
+     }
+
+   // Pemicu Hedging Counter di Floating -60% dari Loss Limit
+   double hedgeThresholdPct = - (InpLossLimitPercent * (InpHedgeTriggerPercent / 100.0));
+   
+   if(profitPct <= hedgeThresholdPct && !g_isHedged)
+     {
+      double currentVol = OurVolume();
+      ENUM_ORDER_TYPE counterType = (g_currentDir == NYESER_BUY) ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+      
+      if(trade.PositionOpen(_Symbol, counterType, currentVol, 
+                            (counterType == ORDER_TYPE_BUY ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID)), 
+                            0, 0, "Counter Hedge 60%"))
+        {
+         g_isHedged = true;
+         g_lastAction = "HEDGE ACTIVE (60% Floating Loss)";
+
+         if(InpAutoSwitchDir)
+           {
+            g_currentDir = (g_currentDir == NYESER_BUY) ? NYESER_SELL : NYESER_BUY;
+           }
+        }
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -296,7 +331,6 @@ bool OpenSlice(const ENUM_ORDER_TYPE type, const double lots)
    bool ok = (type == ORDER_TYPE_BUY) ? trade.Buy(lots, _Symbol) : trade.Sell(lots, _Symbol);
    if(ok)
      {
-      // Bunyi audio saat posisi/slice baru terbuka
       if(StringLen(InpSoundOnOpen) > 0)
          PlaySound(InpSoundOnOpen);
 
@@ -316,10 +350,10 @@ bool OpenSlice(const ENUM_ORDER_TYPE type, const double lots)
 //+------------------------------------------------------------------+
 void MaybeOpenFullMargin()
   {
-   if(!InpEnableTrading)
+   if(!InpEnableTrading || g_isHedged)
       return;
 
-   ENUM_ORDER_TYPE type = (InpDirection == NYESER_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   ENUM_ORDER_TYPE type = (g_currentDir == NYESER_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
    int     count    = CountOurPositions();
    int     slices   = SliceCount();
    double minLot   = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
@@ -482,7 +516,7 @@ bool PrepareLineModel(ENUM_ORDER_TYPE &type, double &volume, double &markPrice,
       return(true);
      }
 
-   type      = (InpDirection == NYESER_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   type      = (g_currentDir == NYESER_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
    volume    = FullMarginLots(type);
    if(volume <= 0.0)
       volume = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
@@ -677,7 +711,8 @@ void UpdateWindow()
 
    string secLine = "1970  detik " + IntegerToString(unixSeconds) + "    keranjang " + IntegerToString(basketSec) + "s";
    string stLine  = StringFormat(
-                    "nyeserpip  P/L %.2f%%  (TP %.2f / rugi %.2f)\ntiket %d/%d  lot %.2f/%.2f  %s\n%s",
+                    "nyeserpip [%s]  P/L %.2f%%  (TP %.2f / rugi %.2f)\ntiket %d/%d  lot %.2f/%.2f  %s\n%s",
+                    (g_currentDir == NYESER_BUY ? "BUY" : "SELL"),
                     pct,
                     InpProfitBasketPercent,
                     InpLossLimitPercent,
