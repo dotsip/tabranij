@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
-//|                                                   nyeserpip.mq5 |
-//|            Full-margin basket EA: profit/loss % + target lines    |
-//|                    Window key: 1970 (detik Unix epoch)          |
+//|                                                    nyeserpip.mq5 |
+//|            Full-margin basket EA: profit/loss % + target lines   |
+//|                     Window key: 1970 (detik Unix epoch)          |
 //+------------------------------------------------------------------+
 #property copyright "nyeserpip"
-#property version   "1.05"          // Versi UI/UX terbaru
+#property version   "1.06"          // Tambah fitur bunyi open & close
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -30,6 +30,10 @@ input int            InpSlippagePoints       = 30;               // Slippage (po
 input int            InpTimerSeconds         = 1;                // Refresh window (detik)
 input bool           InpFitChartToLines      = true;             // Sesuaikan skala chart ke garis
 input bool           InpEntryAtSecond00      = true;             // Entry hanya saat detik 00
+
+input group "Fitur Suara"
+input string         InpSoundOnClose         = "ok.wav";         // Suara saat close keranjang
+input string         InpSoundOnOpen          = "expert.wav";     // Suara saat open posisi/slice
 
 CTrade trade;
 long   g_chart = 0;
@@ -181,6 +185,11 @@ void CloseBasket(const string reason)
          continue;
       trade.PositionClose(ticket);
      }
+   
+   // Bunyi audio saat keranjang ditutup
+   if(StringLen(InpSoundOnClose) > 0)
+      PlaySound(InpSoundOnClose);
+
    g_lastCloseTime = TimeCurrent();
    g_basketStart   = 0;
    g_targetLots    = 0.0;
@@ -287,6 +296,10 @@ bool OpenSlice(const ENUM_ORDER_TYPE type, const double lots)
    bool ok = (type == ORDER_TYPE_BUY) ? trade.Buy(lots, _Symbol) : trade.Sell(lots, _Symbol);
    if(ok)
      {
+      // Bunyi audio saat posisi/slice baru terbuka
+      if(StringLen(InpSoundOnOpen) > 0)
+         PlaySound(InpSoundOnOpen);
+
       g_lastSliceTime = TimeCurrent();
       if(g_basketStart == 0)
          g_basketStart = TimeCurrent();
