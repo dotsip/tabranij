@@ -4,7 +4,7 @@
 //|                           Window key: 1970 (detik Unix epoch)    |
 //+------------------------------------------------------------------+
 #property copyright "nyeserpip"
-#property version   "1.03"
+#property version   "1.05"          // Versi UI/UX terbaru
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -58,6 +58,7 @@ int OnInit()
    trade.SetDeviationInPoints(InpSlippagePoints);
    trade.SetAsyncMode(false);
    ApplyFillingMode();
+
    if(AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
       Print("nyeserpip: akun netting menggabungkan tiket. Pakai akun hedging agar pecahan full margin jadi beberapa posisi.");
 
@@ -155,8 +156,7 @@ void CollectBasket(double &profit, double &netVolume, double &vwap, datetime &ol
       long   type  = PositionGetInteger(POSITION_TYPE);
       datetime t   = (datetime)PositionGetInteger(POSITION_TIME);
 
-      profit += PositionGetDouble(POSITION_PROFIT)
-                + PositionGetDouble(POSITION_SWAP);
+      profit += PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
 
       double signedVol = (type == POSITION_TYPE_BUY) ? vol : -vol;
       netVolume += signedVol;
@@ -243,9 +243,7 @@ double NormalizeVolume(double lots)
 //+------------------------------------------------------------------+
 double FullMarginLots(const ENUM_ORDER_TYPE type)
   {
-   double price = (type == ORDER_TYPE_BUY)
-                  ? SymbolInfoDouble(_Symbol, SYMBOL_ASK)
-                  : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double price = (type == ORDER_TYPE_BUY) ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
    double marginOneLot = 0.0;
    if(!OrderCalcMargin(type, _Symbol, 1.0, price, marginOneLot) || marginOneLot <= 0.0)
@@ -286,9 +284,7 @@ double OurVolume()
 //+------------------------------------------------------------------+
 bool OpenSlice(const ENUM_ORDER_TYPE type, const double lots)
   {
-   bool ok = (type == ORDER_TYPE_BUY)
-             ? trade.Buy(lots, _Symbol)
-             : trade.Sell(lots, _Symbol);
+   bool ok = (type == ORDER_TYPE_BUY) ? trade.Buy(lots, _Symbol) : trade.Sell(lots, _Symbol);
    if(ok)
      {
       g_lastSliceTime = TimeCurrent();
@@ -447,9 +443,7 @@ bool PrepareLineModel(ENUM_ORDER_TYPE &type, double &volume, double &markPrice,
       type      = (netVol > 0.0) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
       volume    = MathAbs(netVol);
       openPrice = (vwap > 0.0) ? vwap : markPrice;
-      markPrice = (type == ORDER_TYPE_BUY)
-                  ? SymbolInfoDouble(_Symbol, SYMBOL_BID)
-                  : SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      markPrice = (type == ORDER_TYPE_BUY) ? SymbolInfoDouble(_Symbol, SYMBOL_BID) : SymbolInfoDouble(_Symbol, SYMBOL_ASK);
       if(openPrice <= 0.0)
          openPrice = markPrice;
       margin = AccountInfoDouble(ACCOUNT_MARGIN);
@@ -462,9 +456,7 @@ bool PrepareLineModel(ENUM_ORDER_TYPE &type, double &volume, double &markPrice,
    volume    = FullMarginLots(type);
    if(volume <= 0.0)
       volume = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
-   markPrice = (type == ORDER_TYPE_BUY)
-               ? SymbolInfoDouble(_Symbol, SYMBOL_ASK)
-               : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   markPrice = (type == ORDER_TYPE_BUY) ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
    openPrice = markPrice;
    profit    = 0.0;
    if(!OrderCalcMargin(type, _Symbol, volume, openPrice, margin))
@@ -554,16 +546,18 @@ void DrawPriceLine(const string name, const double price, const color clr,
    ObjectSetString(g_chart, name, OBJPROP_TEXT, caption);
    ObjectSetString(g_chart, name, OBJPROP_TOOLTIP, caption);
 
-   string arrowName = name + "_arrow";
-   if(ObjectFind(g_chart, arrowName) < 0)
-      ObjectCreate(g_chart, arrowName, OBJ_ARROW_RIGHT_PRICE, 0, t1, price);
-   ObjectSetInteger(g_chart, arrowName, OBJPROP_TIME, t1);
-   ObjectSetDouble(g_chart, arrowName, OBJPROP_PRICE, price);
-   ObjectSetInteger(g_chart, arrowName, OBJPROP_COLOR, clr);
-   ObjectSetInteger(g_chart, arrowName, OBJPROP_WIDTH, 2);
-   ObjectSetInteger(g_chart, arrowName, OBJPROP_HIDDEN, false);
-   ObjectSetInteger(g_chart, arrowName, OBJPROP_SELECTABLE, false);
-   ObjectSetString(g_chart, arrowName, OBJPROP_TOOLTIP, caption);
+   string buttonName = name + "_btn";
+   if(ObjectFind(g_chart, buttonName) < 0)
+      ObjectCreate(g_chart, buttonName, OBJ_BUTTON, 0, t1, price);
+   ObjectSetInteger(g_chart, buttonName, OBJPROP_TIME, t1);
+   ObjectSetDouble(g_chart, buttonName, OBJPROP_PRICE, price);
+   ObjectSetInteger(g_chart, buttonName, OBJPROP_COLOR, clr);
+   ObjectSetInteger(g_chart, buttonName, OBJPROP_BGCOLOR, clr);
+   ObjectSetInteger(g_chart, buttonName, OBJPROP_WIDTH, 2);
+   ObjectSetInteger(g_chart, buttonName, OBJPROP_HIDDEN, false);
+   ObjectSetInteger(g_chart, buttonName, OBJPROP_SELECTABLE, false);
+   ObjectSetString(g_chart, buttonName, OBJPROP_TEXT, "");
+   ObjectSetString(g_chart, buttonName, OBJPROP_TOOLTIP, caption);
 
    string labelName = name + "_tag";
    datetime tLabel = t1 + PeriodSeconds() * 2;
@@ -609,7 +603,7 @@ void CreateWindow()
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_XSIZE, 380);
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_YSIZE, 132);
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BGCOLOR, C'12,16,24');
-      ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+      ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BORDER_TYPE, BORDER_RAISED);  // Border full sekarang
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_COLOR, C'0,180,255');
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_WIDTH, 1);
       ObjectSetInteger(g_chart, OBJ_WINDOW, OBJPROP_BACK, false);
@@ -667,5 +661,4 @@ void UpdateWindow()
    ObjectSetString(g_chart, OBJ_SECONDS, OBJPROP_TEXT, secLine);
    ObjectSetString(g_chart, OBJ_STATUS, OBJPROP_TEXT, stLine);
   }
-
-//+------------------------------------------------------------------+
+//+------------------------------------------------------
